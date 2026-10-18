@@ -454,3 +454,7 @@ details.more[open] > summary { margin-bottom: 10px; }
 .btn.big { width: 100%; padding: 14px; font-size: 17px; }
 .w-choice { display: grid; gap: 2px; text-align: start; background: var(--bg); box-shadow: var(--raise); border: 0; border-radius: var(--r); padding: 14px 16px; color: var(--ink); font: inherit; cursor: pointer; }
 .w-choice small { color: var(--muted); } .w-choice:hover { box-shadow: 0 0 0 2px var(--o1); }
+
+.upd-pill { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 99px; background: linear-gradient(135deg, var(--o2), var(--o1)); color: var(--o-ink); font-weight: 800; font-size: 13px; text-decoration: none; white-space: nowrap; flex: none; }
+.upd-pill svg { width: 16px; height: 16px; }
+.brand .logo-mark { width: 34px; height: 34px; border-radius: 9px; display: block; }

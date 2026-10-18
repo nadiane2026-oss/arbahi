@@ -445,3 +445,55 @@ export function receivedCsv(list) {
   const head = ['الاسم', 'الهاتف', 'الولاية', 'البلدية', 'المنتج', 'المبلغ', 'رقم التتبع', 'تاريخ الاستلام'];
   return '﻿' + [head, ...list.map((r) => [r.name, r.phone, r.wilaya, r.commune, r.product, r.total, r.tracking, r.date])].map((r) => r.map(csvCell).join(',')).join('\r\n');
 }
+
+/* ---------------- المالية: مراحل الدفع في Ecotrack ----------------
+ * Livré non encaissé ← Encaissé non payé ← Paiement prêt ← Payé (سجل الدفعات المستلمة) */
+export const PAY_STAGES = ['uncollected', 'collected', 'ready', 'paid'];
+export function payStage(label) {
+  const n = words(label);
+  if (!n.trim()) return '';
+  const has = (...ks) => ks.some((k) => n.includes(` ${k} `));
+  if (has('paye et archive', 'paiement archive', 'paiements archives', 'paiement recu', 'paiements recus', 'payed archived')) return 'paid';
+  if (has('paiements prets', 'paiement pret', 'payment ready')) return 'ready';
+  if (has('non encaisse', 'non encaissee')) return 'uncollected';
+  if (has('encaisse non paye', 'livre encaisse', 'encaisse', 'encaissed')) return 'collected';
+  if (has('livre', 'livree', 'livres', 'livred')) return 'uncollected';
+  return '';
+}
+/** مرحلة الدفع لطلب مسلَّم (وإلا '') */
+export function payOf(o) {
+  if (!o || o.stage === 'cancelled' || stepOf(o) !== 'delivered') return '';
+  return payStage(o.eco?.label) || 'uncollected';
+}
+/** المبلغ الذي سيصلك من هذا الطلب (بدون أجرة شركة التوصيل إن كانت معروفة) */
+export const orderNet = (o) => Math.max(0, num(o.total) - num(o.shipping));
+
+export function financeGroups(orders) {
+  const g = { uncollected: [], collected: [], ready: [], paid: [] };
+  for (const o of orders) { const p = payOf(o); if (p) g[p].push(o); }
+  const sum = (l) => l.reduce((a, o) => a + orderNet(o), 0);
+  return { ...g, sums: Object.fromEntries(PAY_STAGES.map((k) => [k, sum(g[k])])) };
+}
+/** طلبات مدفوعة لم يُحسب ربحها بعد، مجمّعة حسب يوم الاستلام */
+export function pendingBatches(orders) {
+  const by = new Map();
+  for (const o of orders) {
+    if (payOf(o) !== 'paid' || o.payRef) continue;
+    const day = String(o.eco?.payAt || o.eco?.at || o.createdAt || '').slice(0, 10) || 'unknown';
+    if (!by.has(day)) by.set(day, []);
+    by.get(day).push(o);
+  }
+  return [...by.entries()].map(([day, list]) => ({ day, orders: list, total: list.reduce((a, o) => a + orderNet(o), 0) })).sort((a, b) => b.day.localeCompare(a.day));
+}
+/** يحوّل دفعة مستلمة إلى "ورقة استلام" يفهمها محرك الأرباح */
+export function decharge_fromOrders(day, list, products) {
+  const parcels = list.map((o) => {
+    const items = [];
+    for (const it of o.items || []) {
+      const p = resolveProduct(it, products);
+      if (p) items.push({ productId: p.id, qty: Math.max(1, Math.round(num(it.qty)) || 1) });
+    }
+    return { tracking: o.tracking || o.id, montant: num(o.total), net: orderNet(o), name: o.name || '', phone: o.phone || '', wilaya: o.wilaya || '', commune: o.commune || '', items, noProduct: false };
+  });
+  return { id: `pay-${day}`, ref: `PAY-${day}`, date: day, sender: 'Ecotrack', count: parcels.length, total: parcels.reduce((a, p) => a + p.net, 0), parcels, createdAt: Date.now(), auto: true };
+}

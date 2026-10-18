@@ -34,9 +34,15 @@ jobs:
         run: |
           mkdir -p ~/.android
           cp android-signing/debug.keystore ~/.android/debug.keystore
+      - name: build number
+        run: echo '{"build": ${{ github.run_number }}}' > www/version.json
       - name: android project
         run: |
           npx cap add android
+          cp -r android-icons/* android/app/src/main/res/
+          printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n  <color name="ic_launcher_background">#FF8A10</color>\n</resources>\n' > android/app/src/main/res/values/ic_launcher_background.xml
+          sed -i 's/versionCode 1/versionCode ${{ github.run_number }}/; s/versionName "1.0"/versionName "1.${{ github.run_number }}"/' android/app/build.gradle
+          grep -n "versionCode\|versionName" android/app/build.gradle
           npx cap sync android
       - name: build apk
         working-directory: android
@@ -47,7 +53,7 @@ jobs:
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk arbahi.apk
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest arbahi.apk --title "Arbahi APK" --notes "Download arbahi.apk and install it on the phone."
+          gh release create latest arbahi.apk --title "Arbahi APK" --notes "build ${{ github.run_number }} - Download arbahi.apk and install it on the phone."
 
   pages:
     runs-on: ubuntu-latest
@@ -59,6 +65,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: build number
+        run: echo '{"build": ${{ github.run_number }}}' > www/version.json
       - name: fonts
         run: |
           npm install --no-save @fontsource-variable/cairo

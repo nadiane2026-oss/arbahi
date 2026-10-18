@@ -76,3 +76,30 @@ assert.equal(ds.products[0].name, 'P1'); assert.equal(ds.products[0].count, 3); 
 assert.equal(sheetCsvUrl('https://docs.google.com/spreadsheets/d/AbC-1/edit?gid=123#gid=123'), 'https://docs.google.com/spreadsheets/d/AbC-1/export?format=csv&gid=123');
 assert.equal(sheetCsvUrl('https://example.com/x'), '');
 console.log('✔ لوحة التحكم والروابط');
+
+// ——— المالية ———
+{
+  const { payStage, payOf, financeGroups, pendingBatches, decharge_fromOrders, orderNet } = await import('../www/js/crm.js');
+  const { decharge, splitProfit, DEFAULT_SETTINGS } = await import('../www/js/calc.js');
+  assert.equal(payStage('Livré non encaissé'), 'uncollected');
+  assert.equal(payStage('Encaissé non payé'), 'collected');
+  assert.equal(payStage('Paiements prêts'), 'ready');
+  assert.equal(payStage('Payé et archivé'), 'paid');
+  const mk = (id, label, total, ship = 600, extra = {}) => ({ id, tracking: 'T' + id, stage: 'sent', name: 'n' + id, total, shipping: ship, items: [{ name: 'منشار', sku: 'SAW', qty: 1 }], eco: { step: 'delivered', group: 'delivered', label, at: '2026-10-18T10:00:00Z', ...extra } });
+  const orders = [mk(1, 'Livré non encaissé', 5000), mk(2, 'Encaissé non payé', 5000), mk(3, 'Paiements prêts', 5000), mk(4, 'Payé et archivé', 10000, 600, { payAt: '2026-10-17T09:00:00Z' }), mk(5, 'Payé et archivé', 5000, 600, { payAt: '2026-10-17T11:00:00Z' })];
+  const g = financeGroups(orders);
+  assert.deepEqual(['uncollected', 'collected', 'ready', 'paid'].map((k) => g[k].length), [1, 1, 1, 2]);
+  assert.equal(g.sums.ready, 4400);
+  const b = pendingBatches(orders);
+  assert.equal(b.length, 1); assert.equal(b[0].day, '2026-10-17'); assert.equal(b[0].total, 9400 + 4400);
+  const products = [{ id: 'p1', name: 'منشار', skus: 'SAW', cost: 2000, price: 5000 }];
+  const doc = decharge_fromOrders(b[0].day, b[0].orders, products);
+  assert.equal(doc.parcels.length, 2); assert.equal(doc.parcels[0].items[0].productId, 'p1');
+  const ctx = { settings: { ...DEFAULT_SETTINGS, metaCost: 1000, confirmRate: 50, deliveryRate: 50 }, productsById: { p1: products[0] }, commitments: [], combos: [] };
+  const t = decharge(doc, ctx);
+  // net 13800 − شراء 4000 − ميتا 2×(1000/0.25=4000) = 1800
+  assert.equal(t.net, 13800); assert.equal(Math.round(t.profit), 1800);
+  const people = splitProfit(t.profit, ctx.settings);
+  assert.equal(people.reduce((a, p) => a + p.amount, 0), 1800);
+  console.log('✔ المالية: مراحل الدفع والدفعات وحساب الربح');
+}

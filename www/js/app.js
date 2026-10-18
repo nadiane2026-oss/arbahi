@@ -6,6 +6,7 @@ import { transport } from './transport.js';
 import { ORDER_TABS, orderTab } from './crm.js';
 import { ecoSync, startEcoSync } from './ecosync.js';
 import { showWelcome } from './welcome.js';
+import { update, checkUpdate, APK_URL } from './update.js';
 import * as home from './views/home.js';
 import * as profit from './views/profit.js';
 import * as orders from './views/orders.js';
@@ -17,11 +18,13 @@ import * as carrier from './views/carrier.js';
 import * as imp from './views/import.js';
 import * as customers from './views/customers.js';
 import * as received from './views/received.js';
+import * as finance from './views/finance.js';
+import * as search from './views/search.js';
 import * as settings from './views/settings.js';
 import { initSheet, openSheet, refreshIfOpen } from './views/sheet.js';
 
-const views = { home, profit, orders, team, products, stock, channels, carrier, import: imp, customers, received, settings };
-const TITLES = { home: 'nav.dash', profit: 'nav.profit', orders: 'nav.orders', team: 'nav.team', products: 'nav.products', stock: 'nav.stock', channels: 'nav.channels', carrier: 'nav.carrier', import: 'nav.import', customers: 'nav.customers', received: 'nav.received', settings: 'nav.settings' };
+const views = { home, profit, orders, team, products, stock, channels, carrier, import: imp, customers, received, finance, search, settings };
+const TITLES = { home: 'nav.dash', profit: 'nav.profit', orders: 'nav.orders', team: 'nav.team', products: 'nav.products', stock: 'nav.stock', channels: 'nav.channels', carrier: 'nav.carrier', import: 'nav.import', customers: 'nav.customers', received: 'nav.received', finance: 'nav.finance', search: 'nav.search', settings: 'nav.settings' };
 const ORDER_SUBS = [...ORDER_TABS, 'all'];
 const NAV = [
   { id: 'home', k: 'nav.dash', i: 'home' },
@@ -30,7 +33,7 @@ const NAV = [
   { id: 'stock', k: 'nav.stock', i: 'stack' },
   { id: 'carrier', k: 'nav.carrier', i: 'truck' },
   { id: 'team', k: 'nav.team', i: 'user' },
-  { id: 'finance', k: 'nav.finance', i: 'wallet', subs: [['profit', 'nav.profit'], ['import', 'nav.import']], owns: ['profit', 'import'] },
+  { id: 'finance', k: 'nav.finance', i: 'wallet', subs: [['finance/uncollected', 'fin.uncollected'], ['finance/collected', 'fin.collected'], ['finance/ready', 'fin.ready'], ['finance/history', 'fin.history'], ['profit', 'nav.profit'], ['import', 'nav.import']], owns: ['finance', 'profit', 'import'] },
   { id: 'received', k: 'nav.received', i: 'check' },
   { id: 'customers', k: 'nav.customers', i: 'users' },
   { id: 'settings', k: 'nav.settings', i: 'settings' },
@@ -62,7 +65,7 @@ function renderNav() {
     }).join('');
     return `<button class="item ${act ? 'active' : ''}" data-grp="${it.id}" aria-expanded="${exp}">${icon(it.i)}<span class="lbl">${T(it.k)}</span>${icon('chev', 'chev')}</button><div class="subs ${exp ? 'open' : ''}">${subs}</div>`;
   }).join('');
-  nav.innerHTML = `<div class="brand"><span class="logo-bar"><i></i><i></i><i></i><i></i></span><span>${T('brand')}</span></div><div class="grp-label">${P('nav.section')}</div>${html}`;
+  nav.innerHTML = `<div class="brand"><img class="logo-mark" src="icons/icon.svg" alt=""><span>${T('brand')}</span></div><div class="grp-label">${P('nav.section')}</div>${html}`;
 }
 
 function renderTop() {
@@ -70,7 +73,7 @@ function renderTop() {
   top.innerHTML = `<button class="burger" data-burger aria-label="${P('nav.menu')}">${icon('menu')}</button>
     ${atHome && trail.length < 2 ? '' : `<button class="burger" data-back aria-label="${P('nav.back')}">${icon('back', 'flip')}</button>`}
     ${atHome ? '' : `<button class="burger" data-home aria-label="${P('nav.dash')}">${icon('home')}</button>`}
-    <div class="grow">${T(TITLES[ui.tab] || 'nav.dash')}</div>${syncChip()}${prefButtons()}`;
+    <div class="grow">${T(TITLES[ui.tab] || 'nav.dash')}</div> ${update.available ? `<a class="upd-pill" href="${APK_URL}" target="_blank" rel="noopener">${icon('download')} ${T('upd.btn')}</a>` : ''}<a class="burger" href="#search" aria-label="${P('nav.search')}">${icon('search')}</a>${syncChip()}${prefButtons()}`;
 }
 
 const trail = [location.hash];
@@ -141,6 +144,7 @@ wirePrefs();
   window.__arbahi = { store, sync, ui, transport };
   applyRoute();
   showWelcome();
+  update.on(renderTop); checkUpdate(); setInterval(checkUpdate, 6 * 3600e3);
   const native = window.Capacitor?.isNativePlatform?.();
   if (!native && 'serviceWorker' in navigator && location.protocol.startsWith('http') && location.hostname !== 'localhost') {
     navigator.serviceWorker.register('sw.js').catch(() => {});

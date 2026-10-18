@@ -1,7 +1,7 @@
 // عمليات الطلبات: قراءة الشيتات، الإرسال إلى Ecotrack، تتبع الحالات. تعمل عبر الوسيط في Supabase.
 import { store } from './core.js';
 import { transport, ecoConfig } from './transport.js';
-import { ordersFromCsv, ecotrackPayload, readEcoOrder, ecoGroup, resolveProduct, orderFromEco, readRemarks, groupOfStep, stepOf } from './crm.js';
+import { payStage, ordersFromCsv, ecotrackPayload, readEcoOrder, ecoGroup, resolveProduct, orderFromEco, readRemarks, groupOfStep, stepOf } from './crm.js';
 import { uid } from './util.js';
 import { P } from './i18n.js';
 
@@ -181,7 +181,7 @@ export async function syncEcotrack({ days = 30, maxPages = 40, remarksLimit = 10
   if (!ecoConfig().token) return { added: 0, updated: 0, changes: [], skipped: true };
   const s = store.settings();
   const known = byTracking();
-  const live = [...known.values()].filter((o) => !['delivered', 'ret_back', 'cancelled'].includes(stepOf(o)));
+  const live = [...known.values()].filter((o) => !['ret_back', 'cancelled'].includes(stepOf(o)) && !(stepOf(o) === 'delivered' && payStage(o.eco?.label) === 'paid'));
   const since = s.ecoSince || dayISO(Date.now() - days * 864e5);
   const oldestLive = live.reduce((a, o) => ((o.createdAt || '').slice(0, 10) < a ? (o.createdAt || '').slice(0, 10) : a), since);
   const floor = dayISO(Date.now() - 85 * 864e5);
@@ -212,12 +212,16 @@ export async function syncEcotrack({ days = 30, maxPages = 40, remarksLimit = 10
       const from = stepOf(cur);
       // لا نرجع للخلف إذا أكدناها في التطبيق ولم يتحدث Ecotrack بعد
       if (e.step === 'ready' && cur.stage === 'sent' && cur.shippedAt && Date.now() - Date.parse(cur.shippedAt) < 30 * 60e3) continue;
-      const patch = { eco: { ...(cur.eco || {}), step: e.step, group: groupOfStep(e.step), label: e.label, at: new Date().toISOString() } };
+      const nowIso = new Date().toISOString();
+      const payFrom = payStage(cur.eco?.label), payTo = payStage(e.label);
+      const patch = { eco: { ...(cur.eco || {}), step: e.step, group: groupOfStep(e.step), label: e.label, at: nowIso } };
+      if (e.step === 'delivered' && payTo !== payFrom) patch.eco.payAt = nowIso;
       if (e.step === 'cancelled') patch.stage = 'cancelled';
       else if (e.step !== 'ready' && cur.stage === 'new') patch.stage = 'sent'; // أُكدت من Ecotrack مباشرة
       store.put('order', cur.id, { ...cur, ...patch });
       updated++;
-      if (from !== e.step) changes.push({ id: cur.id, from, to: e.step, isNew: false });
+      if (e.step === 'delivered' && from === 'delivered' && payTo && payFrom !== payTo) changes.push({ id: cur.id, pay: true, payFrom, payTo, from, to: e.step, isNew: false });
+      else if (from !== e.step) changes.push({ id: cur.id, from, to: e.step, isNew: false, ...(e.step === 'delivered' && payTo ? { pay: true, payFrom: '', payTo } : {}) });
     }
     const last = lastPageOf(r.data);
     if (!items.length || (last ? page >= last : items.length < 10)) break;

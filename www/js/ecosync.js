@@ -4,6 +4,8 @@ import { store } from './core.js';
 import { ecoConfig } from './transport.js';
 import { syncEcotrack } from './ops.js';
 import { P } from './i18n.js';
+import { orderNet } from './crm.js';
+import { fmt } from './util.js';
 import { toast } from './ui.js';
 
 const EVERY = 3 * 60e3;
@@ -22,9 +24,21 @@ async function askPermission() {
 }
 
 let nid = Math.floor(Date.now() / 1000) % 100000;
-function messages(changes) {
+function payMessages(changes) {
+  const by = { collected: [], ready: [], paid: [] };
+  for (const c of changes) { if (c.pay && by[c.payTo]) { const o = store.get('order', c.id); if (o) by[c.payTo].push(o); } }
+  const sum = (l) => l.reduce((a, o) => a + orderNet(o), 0);
   const out = [];
+  if (by.collected.length) out.push({ title: P('notif.collected'), body: P('notif.collectedBody', { n: by.collected.length, a: fmt(sum(by.collected)) }), id: '' });
+  if (by.ready.length) out.push({ title: P('notif.payReady'), body: P('notif.payReadyBody', { n: by.ready.length, a: fmt(sum(by.ready)) }), id: '' });
+  if (by.paid.length) out.push({ title: P('notif.paid'), body: P('notif.paidBody', { a: fmt(sum(by.paid)) }), id: '' });
+  return out;
+}
+
+function messages(changes) {
+  const out = payMessages(changes);
   for (const c of changes) {
+    if (c.pay) continue;
     const o = store.get('order', c.id);
     if (!o) continue;
     const who = o.name || o.tracking;
