@@ -1,0 +1,8 @@
+{
+  "appId": "dz.arbahi.app",
+  "appName": "أرباحي",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "android": { "adjustMarginsForEdgeToEdge": "auto" },
+  "plugins": { "CapacitorHttp": { "enabled": true } }
+}

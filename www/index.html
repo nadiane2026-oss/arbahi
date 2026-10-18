@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ececef">
+  <meta name="color-scheme" content="light dark">
+  <title>أرباحي Arbahi</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap">
+  <link rel="stylesheet" href="css/cairo.css">
+  <link rel="stylesheet" href="css/app.css">
+  <script>
+    // يُظهر أي خطأ غير متوقع على الشاشة بدل أن يبقى التطبيق فارغاً بلا تفسير
+    function showFatal(m) {
+      var d = document.getElementById('fatal') || document.body.appendChild(document.createElement('div'));
+      d.id = 'fatal'; d.textContent = String(m).slice(0, 600);
+    }
+    window.addEventListener('error', function (e) { showFatal('Error: ' + e.message + ' @ ' + (e.filename || '').split('/').pop() + ':' + e.lineno); });
+    window.addEventListener('unhandledrejection', function (e) { showFatal('Error: ' + (e.reason && e.reason.message || e.reason)); });
+  </script>
+</head>
+<body>
+  <div class="app">
+    <aside class="side" id="nav" aria-label="القائمة الرئيسية"></aside>
+    <div class="main-col">
+      <header class="topbar" id="top"></header>
+      <main id="view" tabindex="-1"></main>
+    </div>
+  </div>
+  <div class="scrim" id="scrim"></div>
+  <dialog class="sheet" id="sheet" aria-label="تفاصيل ورقة الاستلام"></dialog>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
