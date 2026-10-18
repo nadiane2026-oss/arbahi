@@ -9,8 +9,8 @@ export const DEFAULT_SETTINGS = {
   salimPct: 10, // من صافي الربح
   restSplit: [
     { name: 'الشركة', pct: 40 },
-    { name: 'العامل الأول', pct: 30 },
-    { name: 'العامل الثاني', pct: 30 },
+    { name: 'سفيان', pct: 30 },
+    { name: 'نجيب', pct: 30 },
   ], // تتقسم على الباقي بعد حصة سليم
   // ---- CRM ----
   sheets: [], // [{id, name, url, since}] شيتات الطلبات
