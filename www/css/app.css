@@ -90,7 +90,8 @@ bdi { unicode-bidi: isolate; }
 }
 :root[dir="rtl"] .side { transform: translateX(100%); }
 :root[dir="ltr"] .side { transform: translateX(-100%); }
-body.nav-open .side { transform: none; box-shadow: 0 0 40px rgba(0, 0, 0, 0.45); }
+/* :root[dir] يجعل هذه القاعدة أقوى من قاعدة الإخفاء أعلاه، وإلا تبقى القائمة مخفية على الهاتف */
+:root[dir] body.nav-open .side { transform: none; box-shadow: 0 0 40px rgba(0, 0, 0, 0.45); }
 .scrim { position: fixed; inset: 0; background: rgba(8, 10, 18, 0.55); z-index: 55; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
 body.nav-open .scrim { opacity: 1; pointer-events: auto; }
 .main-col { min-width: 0; transition: margin 0.28s var(--ease); }
@@ -393,7 +394,7 @@ details.more[open] > summary { margin-bottom: 10px; }
 .oc-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .oc-track { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .tag.eco-delivered { background: var(--ok-bg); color: var(--ok-ink); }
-.tag.eco-returning, .tag.eco-returned, .tag.eco-suspended { background: color-mix(in srgb, var(--neg) 18%, var(--bg)); color: var(--neg); }
+.tag.eco-returning, .tag.eco-returned, .tag.eco-suspended, .tag.eco-cancelled { background: color-mix(in srgb, var(--neg) 18%, var(--bg)); color: var(--neg); }
 .statrow { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 8px; }
 .statrow > div { padding: 8px 10px; border-radius: 14px; box-shadow: var(--sink); display: grid; }
 .statrow span { font-size: 11.5px; color: var(--muted); font-weight: 700; }
@@ -434,3 +435,9 @@ details.more[open] > summary { margin-bottom: 10px; }
 .warn-t { color: var(--neg); } .field.grow { flex: 1; min-width: 160px; }
 @media (max-width: 600px) { .kpis { grid-template-columns: 1fr 1fr; } .k-v { font-size: 18px; } }
 .btn { text-decoration: none; } .sync-chip[data-s="off"] { display: none; }
+
+/* ملاحظات الموزّع على بطاقة الطلبية */
+.remarks { list-style: none; margin: 0; padding: 8px 10px; display: grid; gap: 6px; border-radius: 10px; background: var(--page); }
+.remarks li { display: grid; gap: 1px; font-size: 13.5px; }
+.remarks small { color: var(--muted); font-size: 11.5px; }
+.tag.eco-transit, .tag.eco-delivering { background: color-mix(in srgb, var(--o1) 18%, var(--bg)); color: var(--ink); }

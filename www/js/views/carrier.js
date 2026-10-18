@@ -1,6 +1,7 @@
 import { store, hooks } from '../core.js';
 import { ecoConfig, saveEcoConfig, isNative } from '../transport.js';
-import { testEcotrack, refreshStatuses, lastDebug } from '../ops.js';
+import { testEcotrack, lastDebug } from '../ops.js';
+import { runEcoSync } from '../ecosync.js';
 import { esc } from '../util.js';
 import { icon, pageHead, toast } from '../ui.js';
 import { T, P } from '../i18n.js';
@@ -18,11 +19,13 @@ export function render() {
       <div class="oc-head"><div><h2>Ecotrack</h2><p class="hint">${T('car.text')}</p></div><span class="tag ${c.token ? 'eco-delivered' : ''}">${c.token ? T('car.linked') : T('car.notLinked')}</span></div>
       <label class="field"><span>${T('car.url')}</span><input id="ecoUrl" dir="ltr" value="${esc(c.url || '')}" placeholder="https://yourcompany.ecotrack.dz"></label>
       <label class="field"><span>${T('car.token')}</span><input id="ecoTok" type="password" dir="ltr" value="${esc(c.token || '')}" autocomplete="off"></label>
+      <label class="field"><span>${T('car.since')}</span><input type="date" data-chg="since" dir="ltr" value="${esc(s.ecoSince || '')}"></label>
+      <p class="hint">${T('car.sinceHint')}</p>
       <label class="check"><input type="checkbox" data-chg="askc" ${s.shipAskCollection ? 'checked' : ''}> <span>${T('eco.askCollection')}</span></label>
       <p class="hint">${T('car.privacy')}</p>
       <div class="oc-actions"><button class="btn" data-act="csave">${icon('check')} ${T('car.save')}</button>
         <button class="btn ghost" data-act="ctest">${T('eco.test')}</button>
-        <button class="btn ghost" data-act="cstatus">${icon('refresh')} ${T('orders.refreshStatus')}</button></div>
+        <button class="btn ghost" data-act="cstatus">${icon('refresh')} ${T('orders.syncNow')}</button></div>
       ${res}
     </section>
     ${lastDebug.eco ? `<details class="more"><summary>${T('car.debug')}</summary><pre class="debug" dir="ltr">${esc(JSON.stringify({ path: lastDebug.eco.path, status: lastDebug.eco.status, data: lastDebug.eco.data }, null, 2).slice(0, 3000))}</pre></details>` : ''}`;
@@ -42,7 +45,10 @@ export const handlers = {
       } catch (e) { result = { ok: false, msg: P('eco.bad', { e: e.message }) }; }
       hooks.refresh(true);
     },
-    cstatus: async () => { try { const r = await refreshStatuses(); toast(P('orders.statusDone', { n: r.updated })); } catch (e) { toast(e.message); } hooks.refresh(true); },
+    cstatus: async () => { saveEcoConfig({ url: val('ecoUrl'), token: val('ecoTok') }); await runEcoSync({ silent: false }); hooks.refresh(true); },
   },
-  change: { askc: (el) => store.saveSettings({ shipAskCollection: el.checked ? 1 : 0 }) },
+  change: {
+    askc: (el) => store.saveSettings({ shipAskCollection: el.checked ? 1 : 0 }),
+    since: (el) => store.saveSettings({ ecoSince: el.value || '' }),
+  },
 };

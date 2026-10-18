@@ -9,9 +9,9 @@ import { T, P } from '../i18n.js';
 if (!ui.dash) ui.dash = { period: 'all', mode: 'num' };
 
 function steps(s) {
-  const done = [(s.sheets || []).length > 0, !!ecoConfig().token, store.products().length > 0, store.moves().length > 0];
+  const done = [!!ecoConfig().token, store.products().length > 0, store.moves().length > 0];
   if (done.every(Boolean)) return '';
-  const items = [['channels', 'step.channel', 'step.channelSub', 'link'], ['carrier', 'step.carrier', 'step.carrierSub', 'truck'], ['products', 'step.product', 'step.productSub', 'box'], ['stock', 'step.stock', 'step.stockSub', 'stack']];
+  const items = [['carrier', 'step.carrier', 'step.carrierSub', 'truck'], ['products', 'step.product', 'step.productSub', 'box'], ['stock', 'step.stock', 'step.stockSub', 'stack']];
   return `<section class="welcome"><div class="w-title">${T('step.title')}<div class="w-sub">${T('step.sub')}</div></div>
     <div class="w-steps">${items.map(([r, a, b, i], n) => `<a class="w-step ${done[n] ? 'done' : ''}" href="#${r}"><span class="w-ic">${done[n] ? icon('check') : icon(i)}</span><span><b>${T(a)}</b><small>${T(b)}</small></span></a>`).join('')}</div></section>`;
 }

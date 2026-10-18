@@ -47,7 +47,8 @@ const orders = [
   { ...os[2], stage: 'confirmed' },                                             // محجوز لم يُرسل
 ];
 const { rep } = stockReport(products, moves, orders);
-assert.equal(rep.get('p1').onHand, 9); assert.equal(rep.get('p1').out, 1); assert.equal(rep.get('p1').returned, 1);
+// القاعدة: الكلي ينقص فقط عند التسليم؛ ما في الطريق يُحسب «عند التوصيل»
+assert.equal(rep.get('p1').onHand, 10); assert.equal(rep.get('p1').inHand, 9); assert.equal(rep.get('p1').carrier, 1); assert.equal(rep.get('p1').returned, 1);
 assert.equal(rep.get('p2').onHand, 4); assert.equal(rep.get('p2').sold, 1); assert.equal(rep.get('p2').pending, 2);
 assert.ok(isOut(orders[0]) && !isOut(orders[1]) && !isOut(orders[3]));
 

@@ -174,71 +174,181 @@ export function ecotrackPayload(o) {
   return { payload, problems };
 }
 
-/** مجموعات حالات Ecotrack التي نفهمها. المفتاح: اسم المجموعة. */
-export const ECO_GROUPS = ['prep', 'transit', 'delivering', 'suspended', 'delivered', 'returning', 'returned', 'unknown'];
-const ECO_MAP = [
-  ['returned', ['retours recu', 'retours en stock', 'retours archive', 'return_received', 'returns received']],
-  ['returning', ['retours chez livreur', 'retours en traitement', 'retours prets', 'retours a dispatcher', 'retours en transit', 'return_asked', 'return_in_transit']],
-  ['delivered', ['livre non encaisse', 'livre encaisse', 'paiement pret', 'paiement archive', 'livred', 'livre', 'encaissed', 'payed']],
-  ['suspended', ['suspendu']],
-  ['delivering', ['en livraison', 'dispatched_to_driver', 'attempt_delivery']],
-  ['transit', ['vers hub', 'en hub', 'vers wilaya', 'accepted_by_carrier']],
-  ['prep', ['pret a expedier', 'pret a preparer', 'en ramassage', 'stock en preparation', 'en preparation', 'order_information_received_by_carrier', 'picked']],
+/* ---------------- حالات Ecotrack ----------------
+ * كل حالة في Ecotrack تقابلها "خطوة" في التطبيق، بنفس ترتيب المسار:
+ * prêt à expédier ← (تأكيد) vers station ← en station ← vers wilaya ← en préparation ← en livraison
+ * ← suspendu / livré / retour chez livreur ← retour en transit ← retour en traitement (وصلك).
+ * Ecotrack يرسل الحالة أحياناً كرمز (vers_hub) وأحياناً كنص (Vers station)، فنفهم الاثنين. */
+export const ECO_STEPS = ['ready', 'to_station', 'at_station', 'to_wilaya', 'preparing', 'delivering', 'suspended', 'delivered', 'ret_driver', 'ret_transit', 'ret_back', 'cancelled', 'unknown'];
+const STEP_MAP = [
+  ['ret_back', ['retour en traitement', 'retours en traitement', 'retour recu', 'retours recu', 'retour archive', 'retours archive', 'retours en stock', 'retours prets', 'return received']],
+  ['ret_transit', ['retour transit entrepot', 'retours transit entrepot', 'retour en transit', 'retours en transit', 'return in transit', 'retours a dispatcher', 'retour a dispatcher']],
+  ['ret_driver', ['retour chez livreur', 'retours chez livreur', 'return asked']],
+  ['cancelled', ['annule', 'annulee', 'annules']],
+  ['suspended', ['suspendu', 'suspendue', 'suspendus']],
+  ['delivering', ['en livraison', 'sortie en livraison', 'dispatched to driver', 'attempt delivery']],
+  ['to_station', ['vers station', 'vers hub', 'en ramassage', 'picked', 'en preparation stock', 'stock en preparation']],
+  ['preparing', ['en preparation']],
+  ['to_wilaya', ['vers wilaya']],
+  ['at_station', ['en station', 'en hub', 'accepted by carrier']],
+  ['ready', ['prete a expedier', 'pret a expedier', 'prets a expedier', 'pret a preparer', 'order information received by carrier', 'notification on order']],
+  ['delivered', ['livre non encaisse', 'livre encaisse', 'encaisse non paye', 'paiements prets', 'paiement pret', 'paye et archive', 'paiement archive', 'livred', 'encaissed', 'payed', 'livre', 'livree', 'livres']],
+  ['ret_driver', ['retour', 'retours']],
 ];
-export function ecoGroup(label) {
-  const n = String(label ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
-  if (!n) return 'unknown';
-  for (const [g, keys] of ECO_MAP) if (keys.some((k) => n === k || n.includes(k))) return g;
+const STEP_GROUP = {
+  ready: 'prep', to_station: 'transit', at_station: 'transit', to_wilaya: 'transit', preparing: 'transit',
+  delivering: 'delivering', suspended: 'suspended', delivered: 'delivered',
+  ret_driver: 'returning', ret_transit: 'returning', ret_back: 'returned', cancelled: 'cancelled', unknown: 'unknown',
+};
+/** الخطوات التي تكون فيها السلعة عند شركة التوصيل (خرجت من يدك ولم تُبع ولم ترجع لك بعد) */
+export const CARRIER_STEPS = ['to_station', 'at_station', 'to_wilaya', 'preparing', 'delivering', 'suspended', 'ret_driver', 'ret_transit'];
+
+const words = (s) => ` ${String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
+export function ecoStep(label) {
+  const n = words(label);
+  if (!n.trim()) return 'unknown';
+  for (const [step, keys] of STEP_MAP) if (keys.some((k) => n.includes(` ${k} `))) return step;
   return 'unknown';
 }
+export const ECO_GROUPS = ['prep', 'transit', 'delivering', 'suspended', 'delivered', 'returning', 'returned', 'cancelled', 'unknown'];
+export const ecoGroup = (label) => STEP_GROUP[ecoStep(label)];
+export const groupOfStep = (step) => STEP_GROUP[step] || 'unknown';
 
-/** يستخرج tracking والحالة من عنصر في رد get/orders مهما كانت أسماء الحقول (الرد غير موثق بالكامل) */
+/** الخطوة الحالية لطلب (تدعم الطلبات القديمة التي حُفظت قبل وجود "الخطوة") */
+export function stepOf(o) {
+  if (o.eco?.step && ECO_STEPS.includes(o.eco.step)) return o.eco.step;
+  const s = ecoStep(o.eco?.label);
+  if (s !== 'unknown') return s;
+  return { prep: 'ready', transit: 'to_station', delivering: 'delivering', suspended: 'suspended', delivered: 'delivered', returning: 'ret_driver', returned: 'ret_back' }[o.eco?.group] || (o.tracking ? 'unknown' : '');
+}
+
+const pick = (x, keys) => { for (const k of keys) { const v = x?.[k]; if (v !== undefined && v !== null && String(v).trim() !== '') return v; } return ''; };
+
+/** يستخرج tracking والحالة من عنصر في رد get/orders مهما كانت أسماء الحقول */
 export function readEcoOrder(x) {
   if (!x || typeof x !== 'object') return null;
-  const tracking = String(x.tracking ?? x.tracking_number ?? x.code ?? '').trim();
-  const label = String(x.status ?? x.statut ?? x.etat ?? x.state ?? x.status_label ?? x.situation ?? '').trim();
+  const tracking = String(pick(x, ['tracking', 'tracking_number', 'code'])).trim();
+  let label = pick(x, ['status', 'statut', 'etat', 'state', 'status_label', 'situation', 'last_status']);
+  if (label && typeof label === 'object') label = pick(label, ['name', 'label', 'status', 'code']);
+  label = String(label || '').trim();
   if (!tracking) return null;
-  return { tracking, label, group: ecoGroup(label), raw: x };
+  const step = ecoStep(label);
+  return { tracking, label, step, group: groupOfStep(step), raw: x };
+}
+
+/** "Sandal Armani (42) x2 + Sac" -> [{name, qty}] */
+function itemsFromText(text, qtyHint) {
+  const parts = String(text || '').split(/\s\+\s|\n|\s\|\s/).map((s) => s.trim()).filter(Boolean);
+  if (!parts.length) return [];
+  const out = parts.map((p) => {
+    const m = p.match(/^(.*?)(?:\s*[x×*]\s*(\d{1,3}))$/i);
+    return m && m[1].trim() ? { name: m[1].trim(), qty: +m[2] } : { name: p, qty: 0 };
+  });
+  if (out.length === 1 && !out[0].qty) out[0].qty = Math.max(1, Math.round(num(qtyHint)) || 1);
+  return out.map((i) => ({ sku: '', name: i.name, variant: '', qty: i.qty || 1, price: 0 }));
+}
+
+/** يحوّل طلباً من Ecotrack (get/orders) إلى طلب في التطبيق */
+export function orderFromEco(x) {
+  const e = readEcoOrder(x);
+  if (!e) return null;
+  const r = e.raw;
+  const list = Array.isArray(r.products) ? r.products : Array.isArray(r.produits) ? r.produits : null;
+  const items = list
+    ? list.map((p) => ({ sku: String(pick(p, ['reference', 'sku', 'code']) || ''), name: String(pick(p, ['name', 'produit', 'nom', 'designation']) || ''), variant: '', qty: Math.max(1, Math.round(num(pick(p, ['quantity', 'quantite', 'qty']))) || 1), price: num(pick(p, ['price', 'prix'])) }))
+    : itemsFromText(pick(r, ['produit', 'product', 'products_text']), pick(r, ['quantite', 'quantity']));
+  const wcode = +pick(r, ['wilaya_id', 'code_wilaya', 'wilaya_code']) || wilayaCode(pick(r, ['wilaya', 'wilaya_name']));
+  const created = String(pick(r, ['created_at', 'date_creation', 'date']));
+  const phoneRaw = String(pick(r, ['phone', 'telephone', 'tel']));
+  const desk = String(pick(r, ['stop_desk', 'stopdesk', 'type_livraison'])).toLowerCase();
+  return {
+    id: 'e' + e.tracking.replace(/[^\w-]/g, ''),
+    source: 'ecotrack',
+    sheetId: '', sheetName: String(pick(r, ['boutique', 'shop', 'store']) || ''),
+    createdAt: sheetDate(created) || (created && !isNaN(Date.parse(created)) ? new Date(created).toISOString() : new Date().toISOString()),
+    name: String(pick(r, ['client', 'nom_client', 'name', 'customer']) || ''),
+    phone: phoneLocal(phoneRaw), phoneRaw, phone2: String(pick(r, ['phone_2', 'telephone_2']) || ''),
+    wilaya: wcode ? WILAYAS[wcode - 1] : String(pick(r, ['wilaya', 'wilaya_name']) || ''), wilayaCode: wcode || 0,
+    commune: String(pick(r, ['commune', 'commune_name']) || ''), address: String(pick(r, ['adresse', 'address']) || ''),
+    items: items.length ? items : [{ sku: '', name: '?', variant: '', qty: 1, price: 0 }],
+    shipping: num(pick(r, ['tarif_prestation', 'frais_livraison'])), total: num(pick(r, ['montant', 'amount', 'total'])),
+    delivery: desk === '1' || desk === 'true' || /desk|bureau/.test(desk) ? 'desk' : 'home',
+    reference: String(pick(r, ['reference', 'ref']) || ''),
+    stage: e.step === 'ready' ? 'new' : e.step === 'cancelled' ? 'cancelled' : 'sent',
+    calls: [], note: String(pick(r, ['remarque', 'note']) || ''), confirmedBy: '', confirmedAt: '',
+    tracking: e.tracking, eco: { step: e.step, group: e.group, label: e.label, at: new Date().toISOString() },
+  };
+}
+
+/** يقرأ ملاحظات الموزّع (get/maj) -> [{text, by, at}] من الأحدث للأقدم */
+export function readRemarks(d) {
+  const list = Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : Array.isArray(d?.maj) ? d.maj : d && typeof d === 'object' ? Object.values(d).filter((v) => v && typeof v === 'object') : [];
+  return list.map((m) => ({
+    text: String(pick(m, ['remarque', 'content', 'message', 'text', 'reason', 'maj']) || '').trim(),
+    by: String(pick(m, ['livreur', 'station', 'user', 'by']) || '').trim(),
+    at: String(pick(m, ['created_at', 'date', 'at']) || ''),
+  })).filter((m) => m.text).sort((a, b) => b.at.localeCompare(a.at));
 }
 
 /* ---------------- المخزون ---------------- */
 export const lineKey = (productId, variant = '') => `${productId}|${variant}`;
 
-/** يطابق سطر طلب بمنتج: SKU (قائمة مفصولة بفواصل) ثم الاسم */
+/** يطابق سطر طلب بمنتج: SKU، ثم الاسم، ثم أطول اسم/رمز يظهر داخل نص المنتج في Ecotrack */
 export function resolveProduct(item, products) {
   const sku = norm(item.sku);
+  const aliases = (p) => String(p.skus || '').split(/[,،;]/).map(norm).filter(Boolean);
   if (sku) {
-    const p = products.find((p) => String(p.skus || '').split(/[,،;]/).some((s) => norm(s) === sku));
+    const p = products.find((p) => aliases(p).includes(sku));
     if (p) return p;
   }
   const nm = norm(item.name);
-  return (nm && products.find((p) => norm(p.name) === nm)) || null;
+  if (!nm) return null;
+  const exact = products.find((p) => norm(p.name) === nm || aliases(p).includes(nm));
+  if (exact) return exact;
+  let best = null, len = 0;
+  for (const p of products) for (const k of [norm(p.name), ...aliases(p)]) if (k.length >= 3 && nm.includes(k) && k.length > len) { best = p; len = k.length; }
+  return best;
 }
 
-/** هل يُحسب الطلب خارجاً من المخزون؟ (أُنشئ في Ecotrack ولم يُلغَ ولم يرجع للمخزون) */
-export const isOut = (o) => !!o.tracking && o.stage !== 'cancelled' && o.eco?.group !== 'returned';
+/** هل السلعة عند شركة التوصيل الآن؟ (أكدتها وخرجت، ولم تُسلَّم ولم ترجع لك بعد) */
+export function withCarrier(o) {
+  if (o.stage === 'cancelled' || !o.tracking) return false;
+  const s = stepOf(o);
+  return CARRIER_STEPS.includes(s) || (o.stage === 'sent' && (s === 'ready' || s === 'unknown'));
+}
+export const isOut = withCarrier;
 
 /**
- * رصيد كل منتج: مجموع الحركات اليدوية (إدخال/تعديل) ناقص ما خرج مع الشحن.
- * يرجع Map(productId -> {onHand, in, out, returned, pending, variants:{name:onHand}})
+ * المخزون بقواعدك:
+ *  - المخزون الكلي ينقص فقط عند التسليم (livré).
+ *  - منه "في يدك" و"عند التوصيل": كي تأكد الطلبية تنتقل لعند التوصيل، وكي تولي
+ *    retour en traitement ترجع ليدك (retour chez livreur يبقى عند التوصيل).
+ * يرجع Map(productId -> {onHand, inHand, carrier, added, sold, returned, pending, variants})
  */
 export function stockReport(products, moves, orders) {
-  const rep = new Map(products.map((p) => [p.id, { onHand: 0, added: 0, out: 0, returned: 0, sold: 0, pending: 0, variants: {} }]));
-  const add = (id, v, d) => { const r = rep.get(id); if (!r) return; r.onHand += d; if (v) r.variants[v] = (r.variants[v] || 0) + d; };
-  for (const m of moves) { add(m.productId, m.variant || '', num(m.qty)); const r = rep.get(m.productId); if (r && num(m.qty) > 0) r.added += num(m.qty); }
+  const rep = new Map(products.map((p) => [p.id, { onHand: 0, inHand: 0, carrier: 0, added: 0, sold: 0, returned: 0, pending: 0, out: 0, variants: {} }]));
+  for (const m of moves) {
+    const r = rep.get(m.productId); if (!r) continue;
+    const q = num(m.qty);
+    r.onHand += q; if (m.variant) r.variants[m.variant] = (r.variants[m.variant] || 0) + q;
+    if (q > 0) r.added += q;
+  }
   const unmapped = new Set();
   for (const o of orders) {
-    for (const it of o.items) {
+    if (o.stage === 'cancelled') continue;
+    const s = stepOf(o);
+    for (const it of o.items || []) {
       const p = resolveProduct(it, products);
       if (!p) { if (o.tracking) unmapped.add(it.sku || it.name); continue; }
       const r = rep.get(p.id);
       const q = Math.max(1, Math.round(num(it.qty)) || 1);
-      if (isOut(o)) { add(p.id, it.variant || '', -q); r.out += q; }
-      if (o.tracking && o.eco?.group === 'returned') r.returned += q;
-      if (o.tracking && o.eco?.group === 'delivered') r.sold += q;
-      if (o.stage === 'confirmed' && !o.tracking) r.pending += q;
+      if (s === 'delivered') { r.onHand -= q; r.sold += q; if (it.variant) r.variants[it.variant] = (r.variants[it.variant] || 0) - q; }
+      else if (withCarrier(o)) r.carrier += q;
+      else if (s === 'ret_back') r.returned += q;
+      else if (o.stage === 'new' || o.stage === 'confirmed') r.pending += q;
     }
   }
+  for (const r of rep.values()) { r.inHand = r.onHand - r.carrier; r.out = r.carrier; }
   return { rep, unmapped: [...unmapped] };
 }
 
@@ -298,4 +408,18 @@ export function dashStats(orders, key, now = new Date()) {
     if (o.confirmedBy && isConf) bump(conf, o.confirmedBy);
   }
   return { ...st, products: top(prods), wilayas: top(wil, 8), channels: top(chan), confirmers: top(conf) };
+}
+
+/* ---------------- خانات الطلبات ---------------- */
+/** الخانات بنفس ترتيب المسار في Ecotrack */
+export const ORDER_TABS = ['new', 'to_station', 'at_station', 'to_wilaya', 'preparing', 'delivering', 'suspended', 'delivered', 'returns', 'cancelled', 'other'];
+/** في أي خانة تظهر الطلبية */
+export function orderTab(o) {
+  if (o.stage === 'cancelled') return 'cancelled';
+  if (o.stage === 'new' || o.stage === 'confirmed') return 'new';
+  const s = stepOf(o);
+  if (s === 'ready') return 'to_station'; // أكدناها ولم يتحدث Ecotrack بعد
+  if (s.startsWith('ret_')) return 'returns';
+  if (s === 'cancelled') return 'cancelled';
+  return ORDER_TABS.includes(s) ? s : 'other';
 }

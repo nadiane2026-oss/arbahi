@@ -35,7 +35,6 @@ export function render() {
   const shown = q.trim() ? products.filter((p) => `${p.name} ${p.skus}`.toLowerCase().includes(q.trim().toLowerCase())) : products;
   return `${pageHead('nav.products')}
     <div class="tools"><button class="btn sm" data-act="padd">${icon('plus')} ${T('products.add')}</button>
-      <button class="btn ghost sm" data-act="psync">${icon('refresh')} ${T('prod.sync')}</button>
       <label class="field grow"><span>${T('prod.search')}</span><input type="search" data-inp="q" value="${esc(q)}"></label></div>
     <p class="hint" style="margin-bottom:14px">${T('prod.hint')}</p>
     ${shown.length ? `<div class="ocards" id="pgrid">${shown.map((p) => card(p, rep.get(p.id))).join('')}</div>` : `<div class="empty"><h2>${T('prod.emptyTitle')}</h2><p>${T('prod.emptyText')}</p></div>`}`;

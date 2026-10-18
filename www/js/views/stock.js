@@ -21,9 +21,9 @@ function card(p, r) {
       <div class="stock-big num ${low ? 'neg' : ''}"><bdi>${Math.round(r.onHand)}</bdi></div></div>
     ${vBreak}
     <div class="statrow">
-      <div><span>${T('stock.added')}</span>${num0(r.added)}</div><div><span>${T('stock.out')}</span>${num0(r.out)}</div>
+      <div><span>${T('stock.inHand')}</span>${num0(r.inHand)}</div><div><span>${T('stock.carrier')}</span>${num0(r.carrier)}</div>
       <div><span>${T('stock.sold')}</span>${num0(r.sold)}</div><div><span>${T('stock.returned')}</span>${num0(r.returned)}</div>
-      <div><span>${T('stock.pending')}</span>${num0(r.pending)}</div>
+      <div><span>${T('stock.pending')}</span>${num0(r.pending)}</div><div><span>${T('stock.added')}</span>${num0(r.added)}</div>
     </div>
   </article>`;
 }
@@ -54,7 +54,7 @@ export function render() {
     <div class="oc-actions">${unmapped.map((u) => `<button class="btn ghost sm" data-act="mk" data-sku="${esc(u)}">${T('stock.createFrom')}: ${esc(u)}</button>`).join('')}</div></div></div>` : '';
   const hist = [...moves].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 12);
   const byId = Object.fromEntries(products.map((p) => [p.id, p]));
-  return `${pageHead('stock.title')}${un}${entryForm(products)}
+  return `${pageHead('stock.title')}<p class="hint" style="margin-bottom:12px">${T('stock.rules')}</p>${un}${entryForm(products)}
     ${products.length ? `<div class="ocards">${products.map((p) => card(p, rep.get(p.id))).join('')}</div>` : ''}
     ${hist.length ? `<div class="section-title"><h2>${T('stock.history')}</h2></div><div class="ledger-wrap"><table class="ledger"><tbody>
       ${hist.map((m) => `<tr><td>${esc(byId[m.productId]?.name || '?')}${m.variant ? ` (${esc(m.variant)})` : ''}</td><td class="n num ${m.qty < 0 ? 'neg' : 'pos'}" dir="ltr">${m.qty > 0 ? '+' : ''}${m.qty}</td><td class="hint">${esc(m.note || '')}</td><td class="n hint" dir="ltr">${esc(m.at.slice(0, 16).replace('T', ' '))}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
@@ -78,7 +78,7 @@ export const handlers = {
       selP = id;
       const v = val('sv');
       const { rep } = stockReport(store.products(), store.moves(), store.orders());
-      const r = rep.get(id); const cur = v ? (r.variants[v] || 0) : r.onHand;
+      const r = rep.get(id); const cur = v ? (r.variants[v] || 0) : r.inHand; // الجرد يُحسب على ما في يدك
       const diff = num(raw) - cur;
       if (!diff) return;
       store.put('move', uid(), newMove(id, diff, v, val('sn') || P('stock.fix')));

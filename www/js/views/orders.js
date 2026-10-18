@@ -1,12 +1,14 @@
 import { store, hooks, ui } from '../core.js';
-import { WILAYAS, confirmerStats } from '../crm.js';
-import { pullSheets, refreshStatuses, sendToEcotrack, shipOrder, confirmReturn, updateOrder } from '../ops.js';
+import { WILAYAS, confirmerStats, ORDER_TABS, orderTab, stepOf } from '../crm.js';
+import { sendToEcotrack, shipOrder, updateOrder, confirmOrder, cancelOrder, fetchRemarks } from '../ops.js';
+import { ecoSync, runEcoSync } from '../ecosync.js';
+import { ecoConfig } from '../transport.js';
 import { esc, fmt, ltr, daHtml, num } from '../util.js';
 import { icon, pageHead, toast } from '../ui.js';
 import { T, P } from '../i18n.js';
 import { phoneLocal } from '../crm.js';
 
-const TABS = ['new', 'confirmed', 'sent', 'delivered', 'returns', 'cancelled', 'all'];
+const TABS = [...ORDER_TABS, 'all'];
 const curTab = () => (TABS.includes(ui.sub) ? ui.sub : 'new');
 let busy = '';
 const openIds = new Set();
@@ -16,19 +18,7 @@ const setMe = (v) => { try { localStorage.setItem(ME_KEY, v); } catch { /* تج�
 
 export const noRerender = false;
 
-const inTab = (o, t) => {
-  const g = o.eco?.group;
-  switch (t) {
-    case 'new': return o.stage === 'new';
-    case 'confirmed': return o.stage === 'confirmed';
-    case 'sent': return o.stage === 'sent' && !['delivered', 'returning', 'returned'].includes(g);
-    case 'delivered': return o.stage === 'sent' && g === 'delivered';
-    case 'returns': return o.stage === 'sent' && ['returning', 'returned'].includes(g);
-    case 'cancelled': return o.stage === 'cancelled';
-    case 'all': return true;
-    default: return false;
-  }
-};
+const inTab = (o, t) => t === 'all' || orderTab(o) === t;
 
 const when = (iso) => (iso ? iso.replace('T', ' ').slice(0, 16) : '');
 const itemsText = (o) => o.items.map((i) => `${i.name || i.sku}${i.variant ? ` (${i.variant})` : ''}${i.qty > 1 ? ` × ${i.qty}` : ''}`).join(' + ');
@@ -42,20 +32,27 @@ function cardHtml(o, s) {
   const wa = o.phone ? `https://wa.me/213${o.phone.slice(1)}` : '';
   const callBtns = (s.callResults || []).map((c, i) => `<button class="chip3d sm" data-act="call" data-id="${esc(o.id)}" data-i="${i}">${esc(c)}</button>`).join('');
   const last = calls[calls.length - 1];
+  const fromEco = !!o.tracking;
+  const step = stepOf(o);
   let actions = '';
-  if (o.stage === 'new') {
+  if (o.stage === 'new' && fromEco) {
+    actions = `<button class="btn" data-act="econfirm" data-id="${esc(o.id)}" ${busy ? 'disabled' : ''}>${icon('check')} ${T('orders.confirm')}</button>
+      <button class="btn danger" data-act="ecancel" data-id="${esc(o.id)}" ${busy ? 'disabled' : ''}>${T('orders.cancel')}</button>`;
+  } else if (o.stage === 'new') {
     actions = `<button class="btn" data-act="confirm" data-id="${esc(o.id)}">${icon('check')} ${T('orders.confirm')}</button>
       <button class="btn danger" data-act="cancel" data-id="${esc(o.id)}">${T('orders.cancel')}</button>`;
   } else if (o.stage === 'confirmed') {
     actions = `<button class="btn" data-act="send" data-id="${esc(o.id)}">${icon('upload')} ${T('orders.send')}</button>
       <button class="btn ghost" data-act="reopen" data-id="${esc(o.id)}">${T('orders.reopen')}</button>`;
   } else if (o.stage === 'sent') {
-    if (!o.shippedAt && !['delivered', 'returning', 'returned'].includes(g)) actions += `<button class="btn" data-act="ship" data-id="${esc(o.id)}">${T('orders.ship')}</button>`;
-    if (g === 'returning') actions += `<button class="btn" data-act="retok" data-id="${esc(o.id)}">${icon('box')} ${T('orders.returnReceived')}</button>`;
-  } else if (o.stage === 'cancelled') {
+    if (!o.shippedAt && step === 'ready') actions += `<button class="btn" data-act="ship" data-id="${esc(o.id)}">${T('orders.ship')}</button>`;
+    if (['delivering', 'suspended'].includes(step)) actions += `<button class="btn ghost sm" data-act="rem" data-id="${esc(o.id)}" ${busy ? 'disabled' : ''}>${icon('refresh')} ${T('orders.remarks')}</button>`;
+  } else if (o.stage === 'cancelled' && !fromEco) {
     actions = `<button class="btn ghost" data-act="reopen" data-id="${esc(o.id)}">${T('orders.reopen')}</button>`;
   }
-  const edit = o.stage === 'sent' ? '' : `<details class="more" data-did="${esc(o.id)}" ${openIds.has(o.id) ? 'open' : ''}><summary>${T('orders.edit')}</summary>
+  const rems = o.eco?.remarks || [];
+  const remHtml = rems.length && o.stage === 'sent' ? `<ul class="remarks">${rems.slice(0, 3).map((m) => `<li><span>${esc(m.text)}</span><small>${[m.by, when(m.at)].filter(Boolean).map(esc).join(' · ')}</small></li>`).join('')}</ul>` : '';
+  const edit = o.stage === 'sent' || fromEco ? '' : `<details class="more" data-did="${esc(o.id)}" ${openIds.has(o.id) ? 'open' : ''}><summary>${T('orders.edit')}</summary>
       <div class="row c2">
         ${fieldIn(o.id, 'name', T('f.name'), o.name)}
         ${fieldIn(o.id, 'phone', T('f.phone'), o.phone || o.phoneRaw, 'inputmode="tel" dir="ltr"')}
@@ -77,8 +74,9 @@ function cardHtml(o, s) {
     <div class="oc-line">${icon('phone')}<a href="tel:${esc(o.phone || o.phoneRaw)}" dir="ltr">${esc(o.phone || o.phoneRaw || '—')}</a>${wa ? `<a class="wa" href="${wa}" target="_blank" rel="noopener">WhatsApp</a>` : ''}</div>
     <div class="oc-line ${bad ? 'warn-t' : ''}">${esc(o.wilaya || '—')}${o.wilayaCode ? ` (${o.wilayaCode})` : ''} · ${esc(o.commune || '—')} · ${esc(P('delivery.' + o.delivery))}</div>
     <div class="oc-items">${esc(itemsText(o))}</div>
-    ${bad && ['new', 'confirmed'].includes(o.stage) ? `<p class="hint warn-t">${T('orders.fixData')}</p>` : ''}
-    ${o.tracking ? `<div class="oc-track"><span class="tag eco-${esc(g || 'unknown')}">${T('eco.' + (g || 'unknown'))}</span> <span class="hint">${esc(o.eco?.label || '')}</span> <span class="num" dir="ltr">${esc(o.tracking)}</span></div>` : ''}
+    ${bad && !fromEco && ['new', 'confirmed'].includes(o.stage) ? `<p class="hint warn-t">${T('orders.fixData')}</p>` : ''}
+    ${o.tracking ? `<div class="oc-track"><span class="tag eco-${esc(g || 'unknown')}">${T('st.' + (step || 'unknown'))}</span> ${o.eco?.label && o.eco.label !== P('st.' + step) ? `<span class="hint" dir="ltr">${esc(o.eco.label)}</span>` : ''} <span class="num" dir="ltr">${esc(o.tracking)}</span></div>` : ''}
+    ${remHtml}
     ${o.ecoError ? `<div class="banner err">${icon('alert')}<div>${esc(o.ecoError)}</div></div>` : ''}
     ${['new', 'confirmed'].includes(o.stage) ? `<div class="oc-calls">${callBtns}</div>` : ''}
     ${calls.length ? `<div class="hint">${T('orders.attempts', { n: calls.length })}: ${esc(last.label)} ${last.by ? '· ' + esc(last.by) : ''} · ${ltr(when(last.at))}</div>` : ''}
@@ -103,25 +101,29 @@ export function teamHtml(orders, s) {
       <td data-l="${esc(P('team.delRate'))}" class="n num pos">${pct(x.deliveryRate)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
+const ago = (ms) => { const m = Math.round((Date.now() - ms) / 60e3); return m < 1 ? P('sync.justNow') : P('sync.minAgo', { n: m }); };
+
 export function render() {
   const tab = curTab();
   const s = store.settings();
   const orders = store.orders();
-  const counts = Object.fromEntries(TABS.map((t) => [t, orders.filter((o) => inTab(o, t)).length]));
+  const counts = { all: orders.length };
+  for (const o of orders) { const t = orderTab(o); counts[t] = (counts[t] || 0) + 1; }
   const me = getMe();
   const meSel = (s.confirmers || []).length
     ? `<label class="field me"><span>${T('orders.me')}</span><select data-chg="me"><option value="" ${me ? '' : 'selected'}>${esc(P('orders.noMe'))}</option>${s.confirmers.map((n) => `<option ${n === me ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>` : '';
-  const seg = `<div class="seg wrap" role="tablist">${TABS.map((t) => `<button data-act="tab" data-t="${t}" aria-pressed="${tab === t}">${T('ot.' + t)} <b class="cnt">${counts[t]}</b></button>`).join('')}</div>`;
+  const shownTabs = TABS.filter((t) => t !== 'other' || counts.other);
+  const seg = `<div class="seg wrap" role="tablist">${shownTabs.map((t) => `<button data-act="tab" data-t="${t}" aria-pressed="${tab === t}">${T('ot.' + t)} <b class="cnt">${counts[t] || 0}</b></button>`).join('')}</div>`;
   const list = orders.filter((o) => inTab(o, tab));
+  const state = ecoSync.running ? P('sync.running') : ecoSync.error ? P('sync.failed', { e: ecoSync.error }) : ecoSync.lastAt ? P('sync.last', { t: ago(ecoSync.lastAt) }) : '';
   const tools = `<div class="tools">
-    <button class="btn sm" data-act="pull" ${busy ? 'disabled' : ''}>${icon('refresh')} ${T('orders.refreshSheets')}</button>
-    <button class="btn ghost sm" data-act="status" ${busy ? 'disabled' : ''}>${icon('refresh')} ${T('orders.refreshStatus')}</button>
-    ${tab === 'confirmed' && list.length ? `<button class="btn sm" data-act="sendAll" ${busy ? 'disabled' : ''}>${icon('upload')} ${T('orders.sendAll')} (${list.length})</button>` : ''}
+    <button class="btn sm" data-act="esync" ${ecoSync.running ? 'disabled' : ''}>${icon('refresh')} ${T('orders.syncNow')}</button>
+    <span class="hint ${ecoSync.error ? 'warn-t' : ''}">${esc(state)}</span>
     ${meSel}
   </div>`;
-  const noSheets = !(s.sheets || []).length && !orders.length ? `<div class="banner">${icon('alert')}<div>${T('orders.noSheets')} <a href="#channels">${T('nav.channels')}</a></div></div>` : '';
+  const noEco = !ecoConfig().token ? `<div class="banner">${icon('alert')}<div>${T('orders.noEco')} <a href="#carrier">${T('nav.carrier')}</a></div></div>` : '';
   const body = list.length ? `<div class="ocards">${list.map((o) => cardHtml(o, s)).join('')}</div>` : `<p class="hint" style="padding:18px 4px">${T('orders.empty')}</p>`;
-  return `${pageHead('orders.title')}${noSheets}${seg}${tools}${body}`;
+  return `${pageHead('orders.title')}${noEco}${seg}${tools}${body}`;
 }
 
 const act = async (name, fn) => {
@@ -132,8 +134,16 @@ const act = async (name, fn) => {
 export const handlers = {
   click: {
     tab: (el) => hooks.go('orders/' + el.dataset.t),
-    pull: () => act('pull', async () => { const r = await pullSheets(); toast(r.errors.length ? r.errors[0] : r.added || r.products ? P('orders.pulled', { n: r.added }) + (r.products ? ` · ${P('orders.newProducts', { n: r.products })}` : '') : P('orders.pulledNone')); }),
-    status: () => act('status', async () => { const r = await refreshStatuses(); toast(P('orders.statusDone', { n: r.updated })); }),
+    esync: () => runEcoSync({ silent: false }),
+    econfirm: (el) => {
+      if ((store.settings().confirmers || []).length && !getMe()) return toast(P('orders.noMe'));
+      return act('econfirm', async () => { const r = await confirmOrder(el.dataset.id, getMe()); toast(r.ok ? P('orders.confirmed') : P('orders.sendFail', { e: r.error })); });
+    },
+    ecancel: (el) => {
+      if (!confirm(P('orders.cancelEco'))) return;
+      return act('ecancel', async () => { const r = await cancelOrder(el.dataset.id, getMe()); toast(r.ok ? P('orders.cancelled') : P('orders.sendFail', { e: r.error })); });
+    },
+    rem: (el) => act('rem', async () => { const r = await fetchRemarks(el.dataset.id); if (!r.length) toast(P('orders.noRemarks')); }),
     call: (el) => {
       const o = store.get('order', el.dataset.id); const s = store.settings();
       updateOrder(o.id, { calls: [...(o.calls || []), { label: s.callResults[+el.dataset.i], at: new Date().toISOString(), by: getMe() }] });
@@ -156,7 +166,6 @@ export const handlers = {
       toast(P('orders.sendBatch', { ok, bad }));
     }),
     ship: (el) => act('ship', async () => { const r = await shipOrder(el.dataset.id); toast(r.ok ? P('orders.shipped') : P('orders.sendFail', { e: r.error })); }),
-    retok: (el) => act('retok', async () => { const r = await confirmReturn(el.dataset.id); toast(r.ok ? P('orders.returnDone') : P('orders.sendFail', { e: r.error })); }),
   },
   change: {
     me: (el) => { setMe(el.value); hooks.refresh(true); },
