@@ -35,7 +35,8 @@ jobs:
           mkdir -p ~/.android
           cp android-signing/debug.keystore ~/.android/debug.keystore
       - name: build number
-        run: echo '{"build": ${{ github.run_number }}}' > www/version.json
+        run: |
+          echo '{"build": ${{ github.run_number }}}' > www/version.json
       - name: android project
         run: |
           npx cap add android
@@ -66,7 +67,8 @@ jobs:
         with:
           node-version: 22
       - name: build number
-        run: echo '{"build": ${{ github.run_number }}}' > www/version.json
+        run: |
+          echo '{"build": ${{ github.run_number }}}' > www/version.json
       - name: fonts
         run: |
           npm install --no-save @fontsource-variable/cairo
