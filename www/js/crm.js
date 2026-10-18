@@ -423,3 +423,25 @@ export function orderTab(o) {
   if (s === 'cancelled') return 'cancelled';
   return ORDER_TABS.includes(s) ? s : 'other';
 }
+
+/** قائمة العملاء الذين استلموا طلباتهم (حسب فترة وبحث) */
+export function receivedList(orders, period = 'all', q = '', now = new Date()) {
+  const needle = String(q || '').trim().toLowerCase();
+  return orders
+    .filter((o) => orderTab(o) === 'delivered')
+    .map((o) => ({
+      id: o.id, name: o.name || '', phone: o.phone || '', wilaya: o.wilaya || '', commune: o.commune || '',
+      product: (o.items || []).map((i) => `${i.name || i.sku || '?'}${i.variant ? ' (' + i.variant + ')' : ''}${(i.qty || 1) > 1 ? ' ×' + i.qty : ''}`).join(' + '),
+      total: num(o.total), tracking: o.tracking || '', date: (o.eco?.at || o.createdAt || '').slice(0, 10),
+    }))
+    .filter((r) => inPeriod(r.date, period, now))
+    .filter((r) => !needle || `${r.name} ${r.phone} ${r.wilaya} ${r.commune} ${r.product} ${r.tracking}`.toLowerCase().includes(needle))
+    .sort((a, b) => b.date.localeCompare(a.date));
+}
+
+const csvCell = (v) => { const s = String(v ?? ''); return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+/** CSV يفتحه Excel وGoogle Sheets مباشرة (مع BOM للعربية) */
+export function receivedCsv(list) {
+  const head = ['الاسم', 'الهاتف', 'الولاية', 'البلدية', 'المنتج', 'المبلغ', 'رقم التتبع', 'تاريخ الاستلام'];
+  return '﻿' + [head, ...list.map((r) => [r.name, r.phone, r.wilaya, r.commune, r.product, r.total, r.tracking, r.date])].map((r) => r.map(csvCell).join(',')).join('\r\n');
+}

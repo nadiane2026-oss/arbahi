@@ -87,4 +87,21 @@ export async function saveFile(name, text, mime = 'text/csv') {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
+/** حفظ ملف ثنائي (PDF مثلاً) */
+export async function saveBinary(name, bytes, mime = 'application/pdf') {
+  const cap = window.Capacitor;
+  if (cap?.isNativePlatform?.() && cap.Plugins?.Filesystem && cap.Plugins?.Share) {
+    try {
+      let bin = ''; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      const w = await cap.Plugins.Filesystem.writeFile({ path: name, data: btoa(bin), directory: 'CACHE' });
+      await cap.Plugins.Share.share({ title: name, url: w.uri, dialogTitle: name });
+      return;
+    } catch (e) { if (/cancel/i.test(String(e?.message))) return; throw e; }
+  }
+  const url = URL.createObjectURL(new Blob([bytes], { type: mime }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
 export const COLORS = (i) => `var(--p${(i % 6) + 1})`;

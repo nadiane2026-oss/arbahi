@@ -229,6 +229,12 @@ export const D = {
   'backup.volatile': ['هذا المتصفح لا يحفظ البيانات بشكل دائم. صدّر نسخة احتياطية أو اربط المزامنة.', 'This browser does not keep data permanently. Export a backup or link sync.'],
 
   'nav.back': ['رجوع', 'Back'],
+  'nav.received': ['العملاء المستلمون', 'Received customers'],
+  'rec.count': ['عدد المستلمين', 'Customers received'], 'rec.pdf': ['تحميل PDF', 'Download PDF'], 'rec.csv': ['تحميل شيت (Excel)', 'Download sheet (Excel)'],
+  'rec.hint': ['القائمة تتحدث وحدها كلما صار طلب «مسلَّم» في Ecotrack. اختر الفترة ثم حمّلها متى شئت.', 'The list updates itself whenever an order becomes “delivered” in Ecotrack. Pick a period and download it any time.'],
+  'rec.emptyTitle': ['لا يوجد مستلمون بعد', 'No received customers yet'], 'rec.emptyText': ['تظهر هنا الطلبات التي حالتها «مسلَّم».', 'Orders with the “delivered” status appear here.'],
+  'rec.pdfTitle': ['العملاء الذين استلموا طلباتهم', 'Customers who received their orders'],
+  'rec.cName': ['الاسم', 'Name'], 'rec.cPhone': ['الهاتف', 'Phone'], 'rec.cPlace': ['الولاية والبلدية', 'Wilaya / commune'], 'rec.cProduct': ['المنتج', 'Product'], 'rec.cAmount': ['المبلغ', 'Amount'], 'rec.cDate': ['التاريخ', 'Date'],
   'nav.dash': ['لوحة التحكم', 'Dashboard'],
   'nav.products': ['المنتجات', 'Products'],
   'nav.channels': ['قنوات البيع', 'Sales channels'],

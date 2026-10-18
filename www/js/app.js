@@ -15,11 +15,12 @@ import * as channels from './views/channels.js';
 import * as carrier from './views/carrier.js';
 import * as imp from './views/import.js';
 import * as customers from './views/customers.js';
+import * as received from './views/received.js';
 import * as settings from './views/settings.js';
 import { initSheet, openSheet, refreshIfOpen } from './views/sheet.js';
 
-const views = { home, profit, orders, team, products, stock, channels, carrier, import: imp, customers, settings };
-const TITLES = { home: 'nav.dash', profit: 'nav.profit', orders: 'nav.orders', team: 'nav.team', products: 'nav.products', stock: 'nav.stock', channels: 'nav.channels', carrier: 'nav.carrier', import: 'nav.import', customers: 'nav.customers', settings: 'nav.settings' };
+const views = { home, profit, orders, team, products, stock, channels, carrier, import: imp, customers, received, settings };
+const TITLES = { home: 'nav.dash', profit: 'nav.profit', orders: 'nav.orders', team: 'nav.team', products: 'nav.products', stock: 'nav.stock', channels: 'nav.channels', carrier: 'nav.carrier', import: 'nav.import', customers: 'nav.customers', received: 'nav.received', settings: 'nav.settings' };
 const ORDER_SUBS = [...ORDER_TABS, 'all'];
 const NAV = [
   { id: 'home', k: 'nav.dash', i: 'home' },
@@ -29,6 +30,7 @@ const NAV = [
   { id: 'carrier', k: 'nav.carrier', i: 'truck' },
   { id: 'team', k: 'nav.team', i: 'user' },
   { id: 'finance', k: 'nav.finance', i: 'wallet', subs: [['profit', 'nav.profit'], ['import', 'nav.import']], owns: ['profit', 'import'] },
+  { id: 'received', k: 'nav.received', i: 'check' },
   { id: 'customers', k: 'nav.customers', i: 'users' },
   { id: 'settings', k: 'nav.settings', i: 'settings' },
 ];
