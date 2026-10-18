@@ -63,16 +63,26 @@ function renderNav() {
 }
 
 function renderTop() {
+  const atHome = ui.tab === 'home';
   top.innerHTML = `<button class="burger" data-burger aria-label="${P('nav.menu')}">${icon('menu')}</button>
+    ${atHome && trail.length < 2 ? '' : `<button class="burger" data-back aria-label="${P('nav.back')}">${icon('back', 'flip')}</button>`}
+    ${atHome ? '' : `<button class="burger" data-home aria-label="${P('nav.dash')}">${icon('home')}</button>`}
     <div class="grow">${T(TITLES[ui.tab] || 'nav.dash')}</div>${syncChip()}${prefButtons()}`;
 }
 
+const trail = [location.hash];
+let goingBack = false;
+function goBack() {
+  if (trail.length > 1) { goingBack = true; trail.pop(); history.back(); } else location.hash = '#';
+}
 function closeDrawer() { document.body.classList.remove('nav-open'); }
 document.addEventListener('click', (e) => {
   if (e.target.closest('[data-burger]')) {
     if (window.innerWidth >= 960) document.body.classList.toggle('nav-collapsed'); else document.body.classList.toggle('nav-open');
     return;
   }
+  if (e.target.closest('[data-back]')) { goBack(); return; }
+  if (e.target.closest('[data-home]')) { trail.length = 0; trail.push('#'); location.hash = '#'; closeDrawer(); return; }
   const g = e.target.closest('[data-grp]');
   if (g) { const id = g.dataset.grp; if (open.has(id)) open.delete(id); else open.add(id); renderNav(); return; }
   if (e.target.closest('.side a')) closeDrawer();
@@ -94,7 +104,10 @@ hooks.go = (tab) => { if (location.hash === '#' + tab) { applyRoute(); window.sc
 hooks.openSheet = openSheet;
 
 function applyRoute() { const r = parseHash(); ui.tab = r.base; ui.sub = r.sub; renderAll(true); }
-window.addEventListener('hashchange', () => { applyRoute(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => {
+  if (goingBack) goingBack = false; else if (trail[trail.length - 1] !== location.hash) trail.push(location.hash);
+  if (trail.length > 50) trail.shift();
+  applyRoute(); window.scrollTo(0, 0); });
 
 wire(main, () => views[ui.tab].handlers);
 initSheet();

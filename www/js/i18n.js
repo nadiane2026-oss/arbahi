@@ -228,6 +228,7 @@ export const D = {
   'backup.notBackup': ['هذا ليس ملف نسخة احتياطية من أرباحي', 'This is not an Arbahi backup file'],
   'backup.volatile': ['هذا المتصفح لا يحفظ البيانات بشكل دائم. صدّر نسخة احتياطية أو اربط المزامنة.', 'This browser does not keep data permanently. Export a backup or link sync.'],
 
+  'nav.back': ['رجوع', 'Back'],
   'nav.dash': ['لوحة التحكم', 'Dashboard'],
   'nav.products': ['المنتجات', 'Products'],
   'nav.channels': ['قنوات البيع', 'Sales channels'],

@@ -441,3 +441,6 @@ details.more[open] > summary { margin-bottom: 10px; }
 .remarks li { display: grid; gap: 1px; font-size: 13.5px; }
 .remarks small { color: var(--muted); font-size: 11.5px; }
 .tag.eco-transit, .tag.eco-delivering { background: color-mix(in srgb, var(--o1) 18%, var(--bg)); color: var(--ink); }
+
+.flip { transform: none; } [dir="rtl"] .flip { transform: scaleX(-1); }
+.topbar .burger + .burger { margin-inline-start: -4px; }
