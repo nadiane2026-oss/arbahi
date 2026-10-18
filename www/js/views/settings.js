@@ -1,6 +1,7 @@
 import { store, sync, hooks } from '../core.js';
 import { COMMIT_MODE_KEYS, finalCost, productMeta, splitProfit } from '../calc.js';
 import { toDA } from '../crm.js';
+import { ecoConfig, saveEcoConfig } from '../transport.js';
 import { esc, fmt, daHtml, isSet, num, today, uid } from '../util.js';
 import { icon, pageHead, saveFile, toast } from '../ui.js';
 import { T, P } from '../i18n.js';
@@ -9,6 +10,7 @@ import { itemsLabel } from './shared.js';
 
 // الإعدادات تحفظ نفسها عند الخروج من كل حقل، ولا تُعاد رسمها لتفادي ضياع المؤشر
 export const noRerender = true;
+let pendingEco = null;
 
 const val = (v) => (isSet(v) ? v : '');
 const field = (label, attrs, v, cls = '') =>
@@ -131,6 +133,9 @@ function syncBlock() {
         <button class="btn ghost sm" data-act="scode">${T('sync.copyCode')}</button>
         <button class="btn danger sm" data-act="sout">${T('sync.disconnect')}</button>
       </div>
+      <label class="check"><input type="checkbox" id="inclEco" ${ecoConfig().token ? 'checked' : ''}> <span>${T('sync.includeEco')}</span></label>
+      <textarea id="codeOut" readonly rows="3" dir="ltr" hidden style="width:100%"></textarea>
+      <p class="hint">${T('sync.codeWarn')}</p>
       <p class="hint">${T('sync.codeHelp')}</p>`
     : `
       <p class="hint">${T('sync.optional')}</p>
@@ -199,6 +204,7 @@ export const handlers = {
       el.disabled = true;
       try {
         await sync.login(g('sUrl'), g('sKey'), g('sMail'), g('sPass'));
+        if (pendingEco) { saveEcoConfig(pendingEco); pendingEco = null; }
         toast(P('sync.linked'));
         await sync.syncNow();
         hooks.refresh(true);
@@ -207,7 +213,9 @@ export const handlers = {
     snow: async () => { await sync.syncNow(); toast(sync.status === 'ok' ? P('sync.done') : sync.message || P('sync.failed')); },
     sout: () => { if (confirm(P('sync.confirmOut'))) { sync.logout(); hooks.refresh(true); } },
     scode: async () => {
-      const code = sync.connectionCode();
+      const eco = document.getElementById('inclEco')?.checked ? ecoConfig() : {};
+      const code = sync.connectionCode({ eco });
+      const out = document.getElementById('codeOut'); if (out) { out.value = code; out.hidden = false; out.select?.(); }
       try { await navigator.clipboard.writeText(code); toast(P('sync.copied')); } catch { prompt(P('sync.copyPrompt'), code); }
     },
     bexp: async () => { await saveFile(`arbahi-backup-${today()}.json`, JSON.stringify(store.exportJson()), 'application/json'); },
@@ -254,6 +262,8 @@ export const handlers = {
       try {
         const c = sync.parseCode(el.value);
         document.getElementById('sUrl').value = c.url; document.getElementById('sKey').value = c.key; document.getElementById('sMail').value = c.email;
+        if (c.password) document.getElementById('sPass').value = c.password;
+        pendingEco = c.eco || null;
         toast(P('sync.filled'));
       } catch (e) { toast(e.message); }
     },

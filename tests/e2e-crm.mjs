@@ -17,6 +17,7 @@ const go = async (page, h) => { await page.evaluate((h) => { location.hash = '#'
 async function run(name, viewport) {
   const ctx = await browser.newContext({ viewport, locale: 'ar-DZ', colorScheme: 'light' });
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  await ctx.addInitScript(() => { try { localStorage.setItem('arbahi.welcome', '1'); } catch {} });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`${name}: console ${m.text()}`); });

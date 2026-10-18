@@ -49,6 +49,7 @@ export function createSync(store, { fetchImpl, storage, now = () => Date.now() }
     try {
       const j = await authCall(cfg, 'token?grant_type=password', { email: cfg.email, password });
       cfg.session = toSession(j);
+      cfg.pw = String(password || '');
       if (!cfg.session.user_id) throw new Error(P('err.badResponse'));
       save(cfg);
       set('idle');
@@ -56,6 +57,19 @@ export function createSync(store, { fetchImpl, storage, now = () => Date.now() }
       set(sync.connected() ? 'idle' : 'off', e.message);
       throw e;
     }
+  };
+
+  /** إنشاء حساب جديد (أول هاتف). يتطلب إيقاف «Confirm email» في Supabase */
+  sync.signup = async (url, key, email, password) => {
+    const cfg = { ...load(), url: clean(url), key: String(key || '').trim(), email: String(email || '').trim() };
+    if (!/^https?:\/\//.test(cfg.url)) throw new Error(P('err.badUrl'));
+    if (!cfg.key) throw new Error(P('err.noKey'));
+    if (String(password || '').length < 6) throw new Error(P('err.shortPass'));
+    const j = await authCall(cfg, 'signup', { email: cfg.email, password });
+    if (!j.access_token) throw new Error(P('err.confirmMail'));
+    cfg.session = toSession(j); cfg.pw = String(password);
+    if (!cfg.session.user_id) throw new Error(P('err.badResponse'));
+    save(cfg); set('idle');
   };
 
   sync.logout = () => {
@@ -172,10 +186,23 @@ export function createSync(store, { fetchImpl, storage, now = () => Date.now() }
   };
 
   // رمز اتصال يُنسخ من جهاز إلى آخر (رابط + مفتاح + بريد)
-  sync.connectionCode = () => { const c = load(); return c.url ? btoa(unescape(encodeURIComponent(JSON.stringify({ u: c.url, k: c.key, e: c.email })))) : ''; };
+  /** رمز يُنسخ إلى هاتف آخر. extra: { eco: {url, token} } اختياري */
+  sync.connectionCode = (extra = {}) => {
+    const c = load(); if (!c.url) return '';
+    const o = { u: c.url, k: c.key, e: c.email };
+    if (c.pw) o.p = c.pw;
+    if (extra.eco?.token) { o.eu = extra.eco.url || ''; o.t = extra.eco.token; }
+    return btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+  };
   sync.parseCode = (code) => {
-    try { const o = JSON.parse(decodeURIComponent(escape(atob(String(code).trim())))); return { url: o.u, key: o.k, email: o.e || '' }; }
-    catch { throw new Error(P('err.badCode')); }
+    try {
+      const o = JSON.parse(decodeURIComponent(escape(atob(String(code).replace(/\s+/g, '')))));
+      if (!o.u || !o.k) throw new Error('x');
+      const r = { url: o.u, key: o.k, email: o.e || '' };
+      if (o.p) r.password = o.p;
+      if (o.t) r.eco = { url: o.eu || '', token: o.t };
+      return r;
+    } catch { throw new Error(P('err.badCode')); }
   };
 
   return sync;

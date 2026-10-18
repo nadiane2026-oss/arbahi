@@ -13,6 +13,7 @@ const errors = [];
 async function run(name, viewport, scheme) {
   const ctx = await browser.newContext({ viewport, colorScheme: scheme, acceptDownloads: true, locale: 'ar-DZ' });
   await ctx.route(/fonts\.(googleapis|gstatic)\.com/, (r) => r.fulfill({ status: 200, contentType: 'text/css', body: '' }));
+  await ctx.addInitScript(() => { try { localStorage.setItem('arbahi.welcome', '1'); } catch {} });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${name}: ${e.message}`));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(`${name}: console ${m.text()}`); });

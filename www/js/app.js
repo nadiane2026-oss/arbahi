@@ -5,6 +5,7 @@ import { applyPrefs, onPrefs } from './prefs.js';
 import { transport } from './transport.js';
 import { ORDER_TABS, orderTab } from './crm.js';
 import { ecoSync, startEcoSync } from './ecosync.js';
+import { showWelcome } from './welcome.js';
 import * as home from './views/home.js';
 import * as profit from './views/profit.js';
 import * as orders from './views/orders.js';
@@ -139,6 +140,7 @@ wirePrefs();
   startEcoSync();
   window.__arbahi = { store, sync, ui, transport };
   applyRoute();
+  showWelcome();
   const native = window.Capacitor?.isNativePlatform?.();
   if (!native && 'serviceWorker' in navigator && location.protocol.startsWith('http') && location.hostname !== 'localhost') {
     navigator.serviceWorker.register('sw.js').catch(() => {});

@@ -126,7 +126,9 @@ assert.equal(pc.sync.status, 'ok');
 
 // 9) رمز الاتصال
 const code = phone.sync.connectionCode();
-assert.deepEqual(pc.sync.parseCode(code), { url: URL_, key: 'KEY', email: 'a@x.dz' });
+assert.deepEqual(pc.sync.parseCode(code), { url: URL_, key: 'KEY', email: 'a@x.dz', password: 'secret1' });
+const code2 = phone.sync.connectionCode({ eco: { url: 'https://x.ecotrack.dz', token: 'TKN' } });
+assert.deepEqual(pc.sync.parseCode(code2).eco, { url: 'https://x.ecotrack.dz', token: 'TKN' });
 assert.throws(() => pc.sync.parseCode('???'), /الرمز/);
 
 // 10) نسخة احتياطية
