@@ -419,6 +419,7 @@ export const D = {
   'ch.last': ['آخر جلب', 'Last pull'], 'ch.rows': ['{n} طلب', '{n} orders'], 'ch.never': ['لم يُجلب بعد', 'Not pulled yet'],
   'ch.webWarn': ['الربط المباشر يعمل في تطبيق الهاتف (APK). في المتصفح قد يمنع الأمان الاتصال.', 'Direct linking works in the phone app (APK). A browser may block the connection.'],
   'car.text': ['الصق التوكن من حسابك في Ecotrack. يبقى على هذا الجهاز فقط.', 'Paste the token from your Ecotrack account. It stays on this device only.'],
+  'car.webUser': ['بريد/اسم دخول موقع Ecotrack', 'Ecotrack website login'], 'car.webPass': ['كلمة سر موقع Ecotrack', 'Ecotrack website password'], 'car.webHint': ['لقراءة مراحل الدفع (غير محصّلة، جاهزة، سجل). تبقى على هاتفك فقط.', 'To read payment stages. Stored on your phone only.'],
   'car.linked': ['مربوط', 'Linked'], 'car.notLinked': ['غير مربوط', 'Not linked'], 'car.url': ['رابط المنصة', 'Platform URL'], 'car.token': ['توكن API', 'API token'],
   'car.privacy': ['لا تشارك التوكن مع أحد؛ لا يُرفع إلى أي خادم.', 'Never share the token; it is not uploaded anywhere.'], 'car.save': ['حفظ', 'Save'], 'car.debug': ['آخر استجابة (للتشخيص)', 'Last response (debug)'],
   'stock.entryTitle': ['إدخال مخزون المنتج', 'Add product stock'], 'stock.product': ['المنتج', 'Product'],

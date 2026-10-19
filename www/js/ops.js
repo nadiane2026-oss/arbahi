@@ -1,7 +1,8 @@
 // عمليات الطلبات: قراءة الشيتات، الإرسال إلى Ecotrack، تتبع الحالات. تعمل عبر الوسيط في Supabase.
 import { store } from './core.js';
 import { transport, ecoConfig } from './transport.js';
-import { payStage, payOfEco, pendingBatches, decharge_fromOrders, orderNet, ordersFromCsv, ecotrackPayload, readEcoOrder, ecoGroup, resolveProduct, orderFromEco, readRemarks, groupOfStep, stepOf } from './crm.js';
+import { fetchWebStages } from './ecoweb.js';
+import { maxPay, payOf, payStage, payOfEco, pendingBatches, decharge_fromOrders, orderNet, ordersFromCsv, ecotrackPayload, readEcoOrder, ecoGroup, resolveProduct, orderFromEco, readRemarks, groupOfStep, stepOf } from './crm.js';
 import { uid } from './util.js';
 import { P } from './i18n.js';
 
@@ -226,6 +227,22 @@ export async function syncEcotrack({ days = 30, maxPages = 40, remarksLimit = 10
     const last = lastPageOf(r.data);
     if (!items.length || (last ? page >= last : items.length < 10)) break;
   }
+  // مراحل الدفع من صفحات موقع Ecotrack (غير موجودة في الـAPI)
+  try {
+    const delivered = [...known.values()].filter((o) => o.stage !== 'cancelled' && stepOf(o) === 'delivered' && payOf(o) !== 'paid');
+    const stages = await fetchWebStages(delivered.map((o) => o.tracking));
+    if (stages) {
+      const nowIso = new Date().toISOString();
+      for (const o of delivered) {
+        const st = stages.get(o.tracking);
+        if (!st) continue;
+        const cur = store.get('order', o.id), from = payOf(cur);
+        if (maxPay([from, st]) === from) continue;
+        store.put('order', cur.id, { ...cur, eco: { ...(cur.eco || {}), payHint: st, payAt: nowIso, payWeb: st } });
+        changes.push({ id: cur.id, pay: true, payFrom: from, payTo: st, from: 'delivered', to: 'delivered', isNew: false });
+      }
+    }
+  } catch { /* اختياري */ }
   // ملاحظات الموزّع: للطلبيات في التوصيل أو المعلقة (التي تغيرت أولاً، ثم الأقدم تحديثاً)
   const changed = new Set(changes.map((c) => c.id));
   const need = store.orders()

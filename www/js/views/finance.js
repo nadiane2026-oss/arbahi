@@ -2,6 +2,7 @@
 import { store, ui, hooks } from '../core.js';
 import { computeBatch, autoComputeBatches, markPaid } from '../ops.js';
 import { runEcoSync } from '../ecosync.js';
+import { webInfo } from '../ecoweb.js';
 import { PAY_STAGES, payOf, financeGroups, pendingBatches, decharge_fromOrders, orderNet } from '../crm.js';
 import { decharge, splitProfit, finalCost } from '../calc.js';
 import { splitHtml } from './profit.js';
@@ -67,8 +68,9 @@ function receiveBox(g) {
 
 function diagBox(orders) {
   const o = orders.filter((x) => payOf(x)).sort((a, b) => String(b.eco?.at || '').localeCompare(String(a.eco?.at || '')))[0];
-  if (!o) return '';
-  const info = { tracking: o.tracking, label: o.eco?.label, payHint: o.eco?.payHint || '', payFields: o.eco?.payFields || {}, stage: payOf(o) };
+  const web = JSON.stringify(webInfo);
+  if (!o) return `<details class="more"><summary>${T('fin.diag')}</summary><pre class="debug" dir="ltr">${esc(web)}</pre></details>`;
+  const info = { web: webInfo, tracking: o.tracking, label: o.eco?.label, payHint: o.eco?.payHint || '', payFields: o.eco?.payFields || {}, stage: payOf(o) };
   return `<details class="more"><summary>${T('fin.diag')}</summary><p class="hint">${T('fin.diagHint')}</p>
     <pre class="debug" dir="ltr">${esc(JSON.stringify(info, null, 2))}</pre>
     <div class="oc-actions"><button class="btn ghost sm" data-act="fsync">${icon('refresh')} ${T('orders.refreshStatus')}</button></div></details>`;

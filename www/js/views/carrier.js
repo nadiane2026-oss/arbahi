@@ -19,6 +19,9 @@ export function render() {
       <div class="oc-head"><div><h2>Ecotrack</h2><p class="hint">${T('car.text')}</p></div><span class="tag ${c.token ? 'eco-delivered' : ''}">${c.token ? T('car.linked') : T('car.notLinked')}</span></div>
       <label class="field"><span>${T('car.url')}</span><input id="ecoUrl" dir="ltr" value="${esc(c.url || '')}" placeholder="https://yourcompany.ecotrack.dz"></label>
       <label class="field"><span>${T('car.token')}</span><input id="ecoTok" type="password" dir="ltr" value="${esc(c.token || '')}" autocomplete="off"></label>
+      <label class="field"><span>${T('car.webUser')}</span><input id="ecoUser" dir="ltr" value="${esc(c.webUser || '')}" autocomplete="off"></label>
+      <label class="field"><span>${T('car.webPass')}</span><input id="ecoPass" type="password" dir="ltr" value="${esc(c.webPass || '')}" autocomplete="off"></label>
+      <p class="hint">${T('car.webHint')}</p>
       <label class="field"><span>${T('car.since')}</span><input type="date" data-chg="since" dir="ltr" value="${esc(s.ecoSince || '')}"></label>
       <p class="hint">${T('car.sinceHint')}</p>
       <label class="check"><input type="checkbox" data-chg="askc" ${s.shipAskCollection ? 'checked' : ''}> <span>${T('eco.askCollection')}</span></label>
@@ -34,9 +37,9 @@ export function render() {
 const val = (id) => document.getElementById(id)?.value.trim() ?? '';
 export const handlers = {
   click: {
-    csave: () => { saveEcoConfig({ url: val('ecoUrl'), token: val('ecoTok') }); toast(P('stock.saved')); hooks.refresh(true); },
+    csave: () => { saveEcoConfig({ url: val('ecoUrl'), token: val('ecoTok'), webUser: val('ecoUser'), webPass: val('ecoPass') }); toast(P('stock.saved')); hooks.refresh(true); },
     ctest: async () => {
-      saveEcoConfig({ url: val('ecoUrl'), token: val('ecoTok') });
+      saveEcoConfig({ url: val('ecoUrl'), token: val('ecoTok'), webUser: val('ecoUser'), webPass: val('ecoPass') });
       try {
         const r = await testEcotrack();
         const txt = typeof r.data === 'string' ? r.data : JSON.stringify(r.data);
@@ -45,7 +48,7 @@ export const handlers = {
       } catch (e) { result = { ok: false, msg: P('eco.bad', { e: e.message }) }; }
       hooks.refresh(true);
     },
-    cstatus: async () => { saveEcoConfig({ url: val('ecoUrl'), token: val('ecoTok') }); await runEcoSync({ silent: false }); hooks.refresh(true); },
+    cstatus: async () => { saveEcoConfig({ url: val('ecoUrl'), token: val('ecoTok'), webUser: val('ecoUser'), webPass: val('ecoPass') }); await runEcoSync({ silent: false }); hooks.refresh(true); },
   },
   change: {
     askc: (el) => store.saveSettings({ shipAskCollection: el.checked ? 1 : 0 }),

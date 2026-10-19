@@ -479,7 +479,7 @@ export function payFromRaw(raw) {
   }
   return out;
 }
-const maxPay = (list) => list.filter(Boolean).sort((a, b) => PAY_STAGES.indexOf(b) - PAY_STAGES.indexOf(a))[0] || '';
+export const maxPay = (list) => list.filter(Boolean).sort((a, b) => PAY_STAGES.indexOf(b) - PAY_STAGES.indexOf(a))[0] || '';
 /** مرحلة الدفع من بيانات eco (الحالة النصية + إشارات الحقول) */
 export const payOfEco = (eco, manual = '') => maxPay([payStage(eco?.label), eco?.payHint, manual]);
 /** مرحلة الدفع لطلب مسلَّم (وإلا '') */
