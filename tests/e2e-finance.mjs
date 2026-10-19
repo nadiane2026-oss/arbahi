@@ -24,12 +24,20 @@ try {
   await go('finance/collected'); assert.equal(await page.locator('.ocard').count(), 1);
   await go('finance/ready'); assert.equal(await page.locator('.ocard').count(), 1);
   await go('finance/history'); assert.equal(await page.locator('.ocard').count(), 1, 'دفعة واحدة معلقة');
-  await page.click('[data-act="fopen"]'); await page.fill('#fMeta', '1000'); await page.fill('#fConf', '50'); await page.fill('#fDel', '50');
-  await page.click('[data-act="fcalc"]'); await page.waitForSelector('.hero');
+  await page.fill('[data-f="metaCost"]', '1000'); await page.dispatchEvent('[data-f="metaCost"]', 'change');
+  await page.fill('[data-f="confirmRate"]', '50'); await page.dispatchEvent('[data-f="confirmRate"]', 'change');
+  await page.fill('[data-f="deliveryRate"]', '50'); await page.dispatchEvent('[data-f="deliveryRate"]', 'change');
+  await page.click('[data-act="fopen"]'); await page.click('[data-act="fcalc"]'); await page.waitForSelector('.hero');
   // net 8800 − شراء 4000 − ميتا 2×4000 = −3200 (خسارة لأن الميتا مرتفع في هذا المثال)
   assert.match((await page.textContent('.hero-num')).replace(/\s| /g, ''), /-3200|3200/);
   await page.screenshot({ path: `${SHOTS}/fin-2.png`, fullPage: true });
   assert.equal(await page.evaluate(() => window.__arbahi.store.get('order', 'o5').payRef), 'pay-' + new Date().toISOString().slice(0, 10));
+  // تسجيل استلام يدوي: الطلبان غير المحصّلين
+  await page.click('[data-act="frecv"]'); await page.waitForSelector('.rcv');
+  assert.equal(await page.locator('.rcv').count(), 4);
+  await page.locator('.rcv').nth(0).check(); await page.click('[data-act="frecvok"]');
+  await page.waitForSelector('.hero');
+  assert.ok((await page.evaluate(() => window.__arbahi.store.orders().filter((o) => o.payManual === 'paid').length)) >= 1);
   // البحث
   await go('search'); await page.fill('#srchIn', 'منشر');
   await page.waitForSelector('#srchOut .ocard'); assert.ok((await page.locator('#srchOut .ocard').count()) >= 6);

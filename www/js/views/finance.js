@@ -1,13 +1,15 @@
 // المالية: نفس مراحل Livrés في Ecotrack، ثم حساب الأرباح عند استلام الدفعة
 import { store, ui, hooks } from '../core.js';
-import { PAY_STAGES, financeGroups, pendingBatches, decharge_fromOrders, orderNet } from '../crm.js';
+import { computeBatch, autoComputeBatches, markPaid } from '../ops.js';
+import { runEcoSync } from '../ecosync.js';
+import { PAY_STAGES, payOf, financeGroups, pendingBatches, decharge_fromOrders, orderNet } from '../crm.js';
 import { decharge, splitProfit, finalCost } from '../calc.js';
 import { splitHtml } from './profit.js';
 import { esc, fmt, ltr, daHtml, num } from '../util.js';
 import { icon, pageHead, toast } from '../ui.js';
 import { T, P } from '../i18n.js';
 
-if (!ui.fin) ui.fin = { open: '', result: '' };
+if (!ui.fin) ui.fin = { open: '', result: '', recv: false };
 const TABS = ['uncollected', 'collected', 'ready', 'history'];
 const tabOf = () => (TABS.includes(ui.sub) ? ui.sub : 'uncollected');
 export const noRerender = true;
@@ -44,6 +46,34 @@ function resultCard() {
     ${splitHtml(people, t.profit)}</section>${un}`;
 }
 
+function varsBox() {
+  const s = store.settings();
+  return `<section class="block"><h2>${T('fin.varsTitle')}</h2><p class="hint">${T('fin.varsHint')}</p>
+    <div class="row c3">
+      <label class="field"><span>${T('fin.meta')}</span><input class="n" inputmode="decimal" data-chg="fvar" data-f="metaCost" value="${esc(s.metaCost || '')}"></label>
+      <label class="field"><span>${T('p.confirmShort')}</span><input class="n" inputmode="decimal" data-chg="fvar" data-f="confirmRate" value="${esc(s.confirmRate)}"></label>
+      <label class="field"><span>${T('p.deliveryShort')}</span><input class="n" inputmode="decimal" data-chg="fvar" data-f="deliveryRate" value="${esc(s.deliveryRate)}"></label>
+    </div>
+    <label class="check"><input type="checkbox" data-chg="fauto" ${s.autoProfit === 0 ? '' : 'checked'}> <span>${T('fin.auto')}</span></label></section>`;
+}
+
+function receiveBox(g) {
+  const pool = [...g.ready, ...g.collected, ...g.uncollected];
+  if (!ui.fin.recv) return `<div class="tools"><button class="btn" data-act="frecv">${icon('wallet')} ${T('fin.recvBtn')}</button></div><p class="hint">${T('fin.recvHint')}</p>`;
+  const rows = pool.map((o) => `<label class="check"><input type="checkbox" class="rcv" value="${esc(o.id)}" ${payOf(o) !== 'uncollected' ? 'checked' : ''}> <span>${esc(o.name || o.tracking)} · ${fmt(orderNet(o))} DA · <small>${esc(o.eco?.label || '')}</small></span></label>`).join('');
+  return `<section class="block"><h2>${T('fin.recvTitle')}</h2>${pool.length ? rows : `<p class="hint">${T('fin.emptyTitle')}</p>`}
+    <div class="oc-actions"><button class="btn" data-act="frecvok" ${pool.length ? '' : 'disabled'}>${icon('check')} ${T('fin.recvOk')}</button><button class="btn ghost" data-act="frecvno">${T('import.discard')}</button></div></section>`;
+}
+
+function diagBox(orders) {
+  const o = orders.filter((x) => payOf(x)).sort((a, b) => String(b.eco?.at || '').localeCompare(String(a.eco?.at || '')))[0];
+  if (!o) return '';
+  const info = { tracking: o.tracking, label: o.eco?.label, payHint: o.eco?.payHint || '', payFields: o.eco?.payFields || {}, stage: payOf(o) };
+  return `<details class="more"><summary>${T('fin.diag')}</summary><p class="hint">${T('fin.diagHint')}</p>
+    <pre class="debug" dir="ltr">${esc(JSON.stringify(info, null, 2))}</pre>
+    <div class="oc-actions"><button class="btn ghost sm" data-act="fsync">${icon('refresh')} ${T('orders.refreshStatus')}</button></div></details>`;
+}
+
 export function render() {
   const tab = tabOf();
   const g = financeGroups(store.orders());
@@ -53,7 +83,7 @@ export function render() {
     const batches = pendingBatches(store.orders());
     const done = store.decharges();
     const ctx = store.ctx();
-    body = `${resultCard()}
+    body = `${resultCard()}${varsBox()}${receiveBox(g)}
       ${batches.length ? `<div class="section-title"><h2>${T('fin.pending')}</h2></div><div class="ocards">${batches.map(batchCard).join('')}</div>` : ''}
       <div class="section-title"><h2>${T('fin.done')}</h2><a class="btn ghost sm" href="#profit">${T('nav.profit')}</a></div>
       ${done.length ? `<div class="ocards">${done.map((d) => { const t = decharge(d, ctx); return `<article class="ocard" data-act="fsheet" data-id="${esc(d.id)}" style="cursor:pointer"><div class="oc-head"><div><div class="ref">${esc(d.ref || '—')}</div><div class="sub">${ltr(d.date || '')}</div></div>
@@ -67,28 +97,36 @@ export function render() {
       <p class="hint" style="margin-bottom:12px">${T('fin.hint.' + tab)}</p>
       ${list.length ? `<div class="ocards">${list.slice(0, 200).map(orderCard).join('')}</div>` : `<div class="empty"><h2>${T('fin.emptyTitle')}</h2></div>`}`;
   }
-  return `${pageHead('nav.finance')}${seg}${body}`;
+  return `${pageHead('nav.finance')}${seg}${body}${diagBox(store.orders())}`;
 }
 
 const v = (id) => num(document.getElementById(id)?.value);
 export const handlers = {
+  change: {
+    fvar: (el) => store.saveSettings({ [el.dataset.f]: num(el.value), ...(el.dataset.f === 'metaCost' ? { metaForeign: 0 } : {}) }),
+    fauto: (el) => store.saveSettings({ autoProfit: el.checked ? 1 : 0 }),
+  },
   click: {
     ftab: (el) => hooks.go('finance/' + el.dataset.t),
     fopen: (el) => { ui.fin.open = el.dataset.day; ui.fin.result = ''; hooks.refresh(true); },
     fsheet: (el) => hooks.openSheet(el.dataset.id),
     fcalc: (el) => {
-      const day = el.dataset.day;
-      const batch = pendingBatches(store.orders()).find((b) => b.day === day);
-      if (!batch) return;
-      store.saveSettings({ metaCost: v('fMeta'), confirmRate: v('fConf') || 70, deliveryRate: v('fDel') || 70, metaForeign: 0 });
-      const doc = decharge_fromOrders(day, batch.orders, store.products());
-      const old = store.get('decharge', doc.id);
-      const parcels = old ? [...old.parcels, ...doc.parcels.filter((p) => !old.parcels.some((q) => q.tracking === p.tracking))] : doc.parcels;
-      store.put('decharge', doc.id, { ...doc, parcels, count: parcels.length, total: parcels.reduce((a, p) => a + num(p.net), 0) });
-      for (const o of batch.orders) store.put('order', o.id, { ...store.get('order', o.id), payRef: doc.id });
-      ui.fin = { open: '', result: doc.id };
+      const r = computeBatch(el.dataset.day);
+      if (!r) return;
+      ui.fin = { open: '', result: r.id, recv: false };
       toast(P('fin.saved')); hooks.refresh(true);
     },
+    frecv: () => { ui.fin.recv = true; hooks.refresh(true); },
+    frecvno: () => { ui.fin.recv = false; hooks.refresh(true); },
+    frecvok: () => {
+      const ids = [...document.querySelectorAll('.rcv:checked')].map((x) => x.value);
+      if (!ids.length) return;
+      markPaid(ids);
+      const made = autoComputeBatches();
+      ui.fin = { open: '', result: made[0]?.id || '', recv: false };
+      toast(P('fin.saved')); hooks.refresh(true);
+    },
+    fsync: async () => { await runEcoSync({ silent: false }); hooks.refresh(true); },
   },
 };
 void finalCost;

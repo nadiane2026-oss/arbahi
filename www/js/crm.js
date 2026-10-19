@@ -233,7 +233,7 @@ export function readEcoOrder(x) {
   label = String(label || '').trim();
   if (!tracking) return null;
   const step = ecoStep(label);
-  return { tracking, label, step, group: groupOfStep(step), raw: x };
+  return { tracking, label, step, group: groupOfStep(step), raw: x, pay: payFromRaw(x) };
 }
 
 /** "Sandal Armani (42) x2 + Sac" -> [{name, qty}] */
@@ -276,7 +276,7 @@ export function orderFromEco(x) {
     reference: String(pick(r, ['reference', 'ref']) || ''),
     stage: e.step === 'ready' ? 'new' : e.step === 'cancelled' ? 'cancelled' : 'sent',
     calls: [], note: String(pick(r, ['remarque', 'note']) || ''), confirmedBy: '', confirmedAt: '',
-    tracking: e.tracking, eco: { step: e.step, group: e.group, label: e.label, at: new Date().toISOString() },
+    tracking: e.tracking, eco: { step: e.step, group: e.group, label: e.label, at: new Date().toISOString(), payHint: e.pay.stage, payFields: e.pay.fields },
   };
 }
 
@@ -460,10 +460,32 @@ export function payStage(label) {
   if (has('livre', 'livree', 'livres', 'livred')) return 'uncollected';
   return '';
 }
+/** يبحث في حقول رد Ecotrack عن أي إشارة للدفع/التحصيل (أسماء الحقول غير معروفة بالضبط) */
+export function payFromRaw(raw) {
+  const out = { stage: '', fields: {} };
+  if (!raw || typeof raw !== 'object') return out;
+  const rank = (s) => PAY_STAGES.indexOf(s);
+  const up = (s) => { if (s && rank(s) > rank(out.stage)) out.stage = s; };
+  const falsy = /^(0|false|null|non|no|none|undefined|0000-00-00.*)$/i;
+  for (const [k, v] of Object.entries(raw)) {
+    if (v && typeof v === 'object') continue;
+    if (!/pay|paid|paye|paie|encaiss|cash|collect|settle|regl|recouv|decharge|facture|invoice/i.test(k)) continue;
+    out.fields[k] = v;
+    if (typeof v === 'string') up(payStage(v));
+    const truthy = v === true || (typeof v === 'number' && v > 0) || (typeof v === 'string' && v.trim() !== '' && !falsy.test(v.trim()));
+    if (!truthy) continue;
+    if (/(paye|paid|paiement|pay).*(date|at)$|^(date|at)_.*(paye|paid|paiement|pay)|is_?paid|^paye$|^paid$/i.test(k)) up('paid');
+    else if (/encaiss|collect|cash/i.test(k)) up('collected');
+  }
+  return out;
+}
+const maxPay = (list) => list.filter(Boolean).sort((a, b) => PAY_STAGES.indexOf(b) - PAY_STAGES.indexOf(a))[0] || '';
+/** مرحلة الدفع من بيانات eco (الحالة النصية + إشارات الحقول) */
+export const payOfEco = (eco, manual = '') => maxPay([payStage(eco?.label), eco?.payHint, manual]);
 /** مرحلة الدفع لطلب مسلَّم (وإلا '') */
 export function payOf(o) {
   if (!o || o.stage === 'cancelled' || stepOf(o) !== 'delivered') return '';
-  return payStage(o.eco?.label) || 'uncollected';
+  return payOfEco(o.eco, o.payManual) || 'uncollected';
 }
 /** المبلغ الذي سيصلك من هذا الطلب (بدون أجرة شركة التوصيل إن كانت معروفة) */
 export const orderNet = (o) => Math.max(0, num(o.total) - num(o.shipping));

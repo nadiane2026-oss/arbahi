@@ -211,6 +211,9 @@ function save() {
     id: refId, ref: parsed.ref, date: parsed.date, sender: parsed.sender, count: parcels.length,
     total: parsed.total, parcels, createdAt: Date.now(),
   });
+  // الطرود المطابقة لطلبات التطبيق (بالتتبع) تُعتبر مدفوعة ولا تُحسب مرتين
+  const byTrk = new Map(store.orders().filter((o) => o.tracking).map((o) => [o.tracking, o]));
+  for (const p of parcels) { const o = byTrk.get(p.tracking); if (o) store.put('order', o.id, { ...o, payManual: 'paid', payRef: refId }); }
   pending = null; error = '';
   ui.period = 'all';
   toast(P('import.saved', { n: parcels.length }));

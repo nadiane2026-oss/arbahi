@@ -103,3 +103,16 @@ console.log('✔ لوحة التحكم والروابط');
   assert.equal(people.reduce((a, p) => a + p.amount, 0), 1800);
   console.log('✔ المالية: مراحل الدفع والدفعات وحساب الربح');
 }
+
+{
+  const { payFromRaw, payOf } = await import('../www/js/crm.js');
+  assert.equal(payFromRaw({ status: 'Livré', paid: 1 }).stage, 'paid');
+  assert.equal(payFromRaw({ status: 'Livré', date_paiement: '2026-10-18' }).stage, 'paid');
+  assert.equal(payFromRaw({ status: 'Livré', encaisse: 'oui' }).stage, 'collected');
+  assert.equal(payFromRaw({ status: 'Livré', payment_status: 'Paiement prêt' }).stage, 'ready');
+  assert.equal(payFromRaw({ status: 'Livré', payment_type: 'cod' }).stage, '');
+  assert.equal(payFromRaw({ status: 'Livré', is_paid: 0, date_paiement: null }).stage, '');
+  const o = { stage: 'sent', eco: { step: 'delivered', label: 'Livré', payHint: '' }, payManual: 'paid' };
+  assert.equal(payOf(o), 'paid');
+  console.log('✔ تشخيص حقول الدفع');
+}

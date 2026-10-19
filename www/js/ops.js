@@ -1,7 +1,7 @@
 // عمليات الطلبات: قراءة الشيتات، الإرسال إلى Ecotrack، تتبع الحالات. تعمل عبر الوسيط في Supabase.
 import { store } from './core.js';
 import { transport, ecoConfig } from './transport.js';
-import { payStage, ordersFromCsv, ecotrackPayload, readEcoOrder, ecoGroup, resolveProduct, orderFromEco, readRemarks, groupOfStep, stepOf } from './crm.js';
+import { payStage, payOfEco, pendingBatches, decharge_fromOrders, orderNet, ordersFromCsv, ecotrackPayload, readEcoOrder, ecoGroup, resolveProduct, orderFromEco, readRemarks, groupOfStep, stepOf } from './crm.js';
 import { uid } from './util.js';
 import { P } from './i18n.js';
 
@@ -181,7 +181,7 @@ export async function syncEcotrack({ days = 30, maxPages = 40, remarksLimit = 10
   if (!ecoConfig().token) return { added: 0, updated: 0, changes: [], skipped: true };
   const s = store.settings();
   const known = byTracking();
-  const live = [...known.values()].filter((o) => !['ret_back', 'cancelled'].includes(stepOf(o)) && !(stepOf(o) === 'delivered' && payStage(o.eco?.label) === 'paid'));
+  const live = [...known.values()].filter((o) => !['ret_back', 'cancelled'].includes(stepOf(o)) && !(stepOf(o) === 'delivered' && (payOfEco(o.eco, o.payManual) === 'paid')));
   const since = s.ecoSince || dayISO(Date.now() - days * 864e5);
   const oldestLive = live.reduce((a, o) => ((o.createdAt || '').slice(0, 10) < a ? (o.createdAt || '').slice(0, 10) : a), since);
   const floor = dayISO(Date.now() - 85 * 864e5);
@@ -208,13 +208,13 @@ export async function syncEcotrack({ days = 30, maxPages = 40, remarksLimit = 10
         changes.push({ id: o.id, from: '', to: o.eco.step, isNew: true });
         continue;
       }
-      if (!e.label || cur.eco?.label === e.label) continue;
+      if (!e.label || (cur.eco?.label === e.label && (cur.eco?.payHint || '') === (e.pay.stage || ''))) continue;
       const from = stepOf(cur);
       // لا نرجع للخلف إذا أكدناها في التطبيق ولم يتحدث Ecotrack بعد
       if (e.step === 'ready' && cur.stage === 'sent' && cur.shippedAt && Date.now() - Date.parse(cur.shippedAt) < 30 * 60e3) continue;
       const nowIso = new Date().toISOString();
-      const payFrom = payStage(cur.eco?.label), payTo = payStage(e.label);
-      const patch = { eco: { ...(cur.eco || {}), step: e.step, group: groupOfStep(e.step), label: e.label, at: nowIso } };
+      const payFrom = payOfEco(cur.eco, cur.payManual), payTo = payOfEco({ label: e.label, payHint: e.pay.stage }, cur.payManual);
+      const patch = { eco: { ...(cur.eco || {}), step: e.step, group: groupOfStep(e.step), label: e.label, at: nowIso, payHint: e.pay.stage, payFields: e.pay.fields } };
       if (e.step === 'delivered' && payTo !== payFrom) patch.eco.payAt = nowIso;
       if (e.step === 'cancelled') patch.stage = 'cancelled';
       else if (e.step !== 'ready' && cur.stage === 'new') patch.stage = 'sent'; // أُكدت من Ecotrack مباشرة
@@ -247,3 +247,25 @@ export async function syncEcotrack({ days = 30, maxPages = 40, remarksLimit = 10
 export async function refreshStatuses() { const r = await syncEcotrack(); return { updated: r.updated + r.added, checked: 0 }; }
 
 export { ecoGroup };
+
+/** يحسب أرباح دفعة مستلمة (يوم) بالمتغيرات المحفوظة في الإعدادات. يرجع معرّف الورقة */
+export function computeBatch(day) {
+  const batch = pendingBatches(store.orders()).find((b) => b.day === day);
+  if (!batch) return null;
+  const doc = decharge_fromOrders(day, batch.orders, store.products());
+  const old = store.get('decharge', doc.id);
+  const parcels = old ? [...old.parcels, ...doc.parcels.filter((p) => !old.parcels.some((q) => q.tracking === p.tracking))] : doc.parcels;
+  store.put('decharge', doc.id, { ...doc, parcels, count: parcels.length, total: parcels.reduce((a, p) => a + (+p.net || 0), 0) });
+  for (const x of batch.orders) store.put('order', x.id, { ...store.get('order', x.id), payRef: doc.id });
+  return { id: doc.id, day, count: batch.orders.length, net: batch.total };
+}
+/** حساب تلقائي لكل دفعة جديدة (إلا إذا أوقفه المستخدم) */
+export function autoComputeBatches() {
+  if (store.settings().autoProfit === 0) return [];
+  return pendingBatches(store.orders()).map((b) => computeBatch(b.day)).filter(Boolean);
+}
+/** تسجيل يدوي: هذه الطلبات استلمت أموالها */
+export function markPaid(ids) {
+  const now = new Date().toISOString();
+  for (const id of ids) { const o = store.get('order', id); if (o) store.put('order', id, { ...o, payManual: 'paid', eco: { ...(o.eco || {}), payAt: now } }); }
+}

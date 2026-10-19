@@ -41,6 +41,9 @@ jobs:
         run: |
           npx cap add android
           cp -r android-icons/* android/app/src/main/res/
+          mkdir -p android/app/src/main/java/dz/arbahi/app android/app/src/main/res/raw
+          cp android-native/java/*.java android/app/src/main/java/dz/arbahi/app/
+          cp android-native/res/raw/* android/app/src/main/res/raw/
           printf '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n  <color name="ic_launcher_background">#FF8A10</color>\n</resources>\n' > android/app/src/main/res/values/ic_launcher_background.xml
           sed -i 's/versionCode 1/versionCode ${{ github.run_number }}/; s/versionName "1.0"/versionName "1.${{ github.run_number }}"/' android/app/build.gradle
           grep -n "versionCode\|versionName" android/app/build.gradle
@@ -59,6 +62,7 @@ jobs:
               }
           '''
           s = s.replace('android {', block, 1)
+          s = s.replace('dependencies {', "dependencies {\n    implementation 'androidx.work:work-runtime:2.9.1'\n    implementation 'androidx.lifecycle:lifecycle-process:2.8.7'", 1)
           open(p, 'w').write(s)
           PY
           npx cap sync android
