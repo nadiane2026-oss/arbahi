@@ -167,6 +167,9 @@ function calculate() {
   const { parsed, refId } = pending;
   const parcels = parsed.rows.map(({ ok, ...x }) => ({ ...x, items: [], noProduct: true }));
   store.put('decharge', refId, { id: refId, ref: parsed.ref, date: parsed.date, sender: parsed.sender, count: parcels.length, total: parsed.total, parcels, createdAt: Date.now(), calc: { inputs: inp, result: r } });
+  // طلبات التطبيق المطابقة لأرقام التتبع في الورقة تنتقل إلى «Historique paiements»
+  const byTrk = new Map(store.orders().filter((o) => o.tracking).map((o) => [o.tracking, o]));
+  for (const p of parcels) { const o = byTrk.get(p.tracking); if (o && o.payManual !== 'paid') store.put('order', o.id, { ...o, payManual: 'paid', payRef: refId }); }
   result = { r, ref: parsed.ref };
   toast(P('pc.saved'));
   hooks.refresh(true);

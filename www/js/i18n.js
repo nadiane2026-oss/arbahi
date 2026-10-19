@@ -517,3 +517,8 @@ Object.assign(D, {
   'pc.metaFinal': ['كوست ميتا النهائي', 'Final Meta cost'], 'pc.unit': ['كوست الطلب النهائي: {u} دج × {n} طرد', 'Final cost per order: {u} DZD × {n} parcels'],
   'pc.history': ['الحسابات السابقة', 'Previous calculations'], 'pc.parcelsN': ['{n} طرد', '{n} parcels'], 'pc.delete': ['حذف', 'Delete'], 'pc.confirmDel': ['حذف هذا الحساب؟', 'Delete this calculation?'],
 });
+
+Object.assign(D, {
+  'ot.dl_unc': ['Livrés · Non encaissés', 'Delivered · Not collected'], 'ot.dl_col': ['Livrés · Encaissés non payés', 'Delivered · Collected, unpaid'],
+  'ot.dl_rdy': ['Livrés · Paiements prêts', 'Delivered · Payments ready'], 'ot.dl_paid': ['Livrés · Historique paiements', 'Delivered · Payment history'],
+});

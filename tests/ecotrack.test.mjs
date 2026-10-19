@@ -66,7 +66,7 @@ assert.equal(byT('ECO1').eco.remarks[0].text, 'Client ne répond pas');
 // 5) ECO1 تُسلَّم ← المخزون الكلي ينقص 1
 eco.setStatus('ECO1', 'Livré non encaissé');
 await syncEcotrack();
-assert.equal(orderTab(byT('ECO1')), 'delivered');
+assert.equal(orderTab(byT('ECO1')), 'dl_unc');
 assert.deepEqual([stock().onHand, stock().inHand, stock().carrier, stock().sold], [9, 7, 2, 1]);
 
 // 6) ECO2 ترجع: chez livreur لا يغير شيئاً، en traitement ترجع ليدك

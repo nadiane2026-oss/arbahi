@@ -412,7 +412,7 @@ export function dashStats(orders, key, now = new Date()) {
 
 /* ---------------- خانات الطلبات ---------------- */
 /** الخانات بنفس ترتيب المسار في Ecotrack */
-export const ORDER_TABS = ['new', 'to_station', 'at_station', 'to_wilaya', 'preparing', 'delivering', 'suspended', 'delivered', 'returns', 'cancelled', 'other'];
+export const ORDER_TABS = ['new', 'to_station', 'at_station', 'to_wilaya', 'preparing', 'delivering', 'suspended', 'dl_unc', 'dl_col', 'dl_rdy', 'dl_paid', 'returns', 'cancelled', 'other'];
 /** في أي خانة تظهر الطلبية */
 export function orderTab(o) {
   if (o.stage === 'cancelled') return 'cancelled';
@@ -421,6 +421,7 @@ export function orderTab(o) {
   if (s === 'ready') return 'to_station'; // أكدناها ولم يتحدث Ecotrack بعد
   if (s.startsWith('ret_')) return 'returns';
   if (s === 'cancelled') return 'cancelled';
+  if (s === 'delivered') return { uncollected: 'dl_unc', collected: 'dl_col', ready: 'dl_rdy', paid: 'dl_paid' }[payOf(o)] || 'dl_unc';
   return ORDER_TABS.includes(s) ? s : 'other';
 }
 
@@ -428,7 +429,7 @@ export function orderTab(o) {
 export function receivedList(orders, period = 'all', q = '', now = new Date()) {
   const needle = String(q || '').trim().toLowerCase();
   return orders
-    .filter((o) => orderTab(o) === 'delivered')
+    .filter((o) => o.stage !== 'cancelled' && stepOf(o) === 'delivered')
     .map((o) => ({
       id: o.id, name: o.name || '', phone: o.phone || '', wilaya: o.wilaya || '', commune: o.commune || '',
       product: (o.items || []).map((i) => `${i.name || i.sku || '?'}${i.variant ? ' (' + i.variant + ')' : ''}${(i.qty || 1) > 1 ? ' ×' + i.qty : ''}`).join(' + '),

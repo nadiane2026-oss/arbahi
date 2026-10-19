@@ -14,8 +14,8 @@ function steps(s) {
     <div class="w-steps">${items.map(([r, a, b, i], n) => `<a class="w-step ${done[n] ? 'done' : ''}" href="#${r}"><span class="w-ic">${done[n] ? icon('check') : icon(i)}</span><span><b>${T(a)}</b><small>${T(b)}</small></span></a>`).join('')}</div></section>`;
 }
 
-const STAGE_ICON = { new: 'clipboard', to_station: 'truck', at_station: 'box', to_wilaya: 'truck', preparing: 'stack', delivering: 'truck', suspended: 'alert', delivered: 'check', returns: 'box', cancelled: 'x', other: 'link' };
-const STAGE_CLS = { new: 'k-o', delivered: 'k-g', returns: 'k-r', cancelled: 'k-r', suspended: 'k-y' };
+const STAGE_ICON = { new: 'clipboard', to_station: 'truck', at_station: 'box', to_wilaya: 'truck', preparing: 'stack', delivering: 'truck', suspended: 'alert', dl_unc: 'box', dl_col: 'wallet', dl_rdy: 'check', dl_paid: 'stack', returns: 'box', cancelled: 'x', other: 'link' };
+const STAGE_CLS = { new: 'k-o', dl_unc: 'k-g', dl_col: 'k-g', dl_rdy: 'k-g', dl_paid: 'k-g', returns: 'k-r', cancelled: 'k-r', suspended: 'k-y' };
 
 export function render() {
   const counts = {};
