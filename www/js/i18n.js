@@ -498,3 +498,22 @@ export function P(key, p) {
   if (prefs.lang === 'en') return en;
   return `${ar} / ${en}`;
 }
+
+Object.assign(D, {
+  'dash.stages': ['حركة الطلبيات في Ecotrack', 'Orders in Ecotrack'], 'dash.lastSync': ['آخر مزامنة: {t}', 'Last sync: {t}'],
+  'pc.drop': ['ارفع ورقة الاستلام (PDF)', 'Upload the payout sheet (PDF)'], 'pc.dropText': ['التطبيق يقرأ المبلغ المستلم وعدد الطرود منها.', 'The app reads the received amount and parcel count.'],
+  'pc.change': ['تغيير الملف', 'Change file'], 'pc.received': ['المبلغ المستلم', 'Received amount'],
+  'pc.vars': ['المتغيرات (اكتبها كلها ثم احسب)', 'Variables (fill all, then calculate)'],
+  'pc.eur': ['كوست ميتا الأولي (€)', 'Initial Meta cost (€)'], 'pc.rate': ['سعر اليورو (دج)', 'Euro rate (DZD)'],
+  'pc.confirmRate': ['نسبة التأكيد %', 'Confirmation rate %'], 'pc.deliveryRate': ['نسبة التوصيل %', 'Delivery rate %'],
+  'pc.autoC': ['محسوبة تلقائياً من طلباتك: {a} مؤكدة من {b}', 'Auto from your orders: {a} confirmed of {b}'], 'pc.autoD': ['محسوبة تلقائياً: {a} مسلّمة من {b} مرسلة', 'Auto: {a} delivered of {b} sent'],
+  'pc.autoNone': ['لا توجد طلبات كافية لحسابها، اكتبها بيدك.', 'Not enough orders to compute; enter manually.'],
+  'pc.useAuto': ['استعمال النسب التلقائية', 'Use automatic rates'],
+  'pc.stockDel': ['ثمن توصيل السطوك', 'Stock delivery cost'], 'pc.stock': ['ثمن السطوك', 'Stock price'], 'pc.confPrice': ['ثمن التأكيد', 'Confirmation price'],
+  'pc.mode': ['طريقة الحساب', 'Mode'], 'pc.m.parcel': ['لكل طرد', 'Per parcel'], 'pc.m.total': ['مبلغ إجمالي', 'Total'],
+  'pc.calc': ['احسب الربح', 'Calculate profit'], 'pc.needPdf': ['ارفع ورقة الاستلام أولاً', 'Upload the payout sheet first'],
+  'pc.needRate': ['اكتب سعر اليورو', 'Enter the euro rate'], 'pc.needRates': ['اكتب نسبتي التأكيد والتوصيل', 'Enter confirmation and delivery rates'],
+  'pc.saved': ['تم الحساب والحفظ', 'Calculated and saved'], 'pc.profitOf': ['ربح الورقة {ref}', 'Profit of sheet {ref}'],
+  'pc.metaFinal': ['كوست ميتا النهائي', 'Final Meta cost'], 'pc.unit': ['كوست الطلب النهائي: {u} دج × {n} طرد', 'Final cost per order: {u} DZD × {n} parcels'],
+  'pc.history': ['الحسابات السابقة', 'Previous calculations'], 'pc.parcelsN': ['{n} طرد', '{n} parcels'], 'pc.delete': ['حذف', 'Delete'], 'pc.confirmDel': ['حذف هذا الحساب؟', 'Delete this calculation?'],
+});

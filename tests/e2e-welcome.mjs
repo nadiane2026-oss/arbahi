@@ -30,14 +30,14 @@ try {
   await page.waitForSelector('.welcome-screen', { state: 'detached' });
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('arbahi.eco')).token), 'TKN');
   assert.equal(await page.evaluate(() => window.__arbahi.sync.connected()), true);
-  await page.reload(); await page.waitForSelector('.kpis');
+  await page.reload(); await page.waitForSelector('.stages');
   assert.equal(await page.locator('.welcome-screen').count(), 0, 'لا تظهر مرة ثانية');
   // خيار بدون ربط
   const c2 = await browser.newContext({ viewport: { width: 390, height: 800 } });
   const p2 = await c2.newPage(); p2.on('pageerror', (e) => errors.push(e.message));
   await p2.goto('http://localhost:8094/'); await p2.waitForSelector('.welcome-screen');
   await p2.click('[data-w="next"]'); await p2.click('[data-w="local"]');
-  await p2.waitForSelector('.kpis'); assert.equal(await p2.locator('.welcome-screen').count(), 0);
+  await p2.waitForSelector('.stages'); assert.equal(await p2.locator('.welcome-screen').count(), 0);
   assert.deepEqual(errors, []);
   console.log('✔ اختبار شاشة الترحيب والربط بالكود نجح');
 } finally { await browser.close(); server.close(); }

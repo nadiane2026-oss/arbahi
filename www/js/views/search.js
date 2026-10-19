@@ -9,7 +9,7 @@ export const noRerender = true;
 if (!ui.srch) ui.srch = { q: '' };
 
 const PAGES = [['home', 'nav.dash'], ['orders/new', 'nav.orders'], ['products', 'nav.products'], ['stock', 'nav.stock'], ['channels', 'nav.channels'], ['carrier', 'nav.carrier'], ['team', 'nav.team'],
-  ['finance/uncollected', 'fin.uncollected'], ['finance/collected', 'fin.collected'], ['finance/ready', 'fin.ready'], ['finance/history', 'fin.history'], ['profit', 'nav.profit'], ['import', 'nav.import'], ['received', 'nav.received'], ['customers', 'nav.customers'], ['settings', 'nav.settings']];
+  ['profit', 'nav.profit'], ['received', 'nav.received'], ['customers', 'nav.customers'], ['settings', 'nav.settings']];
 
 function results() {
   const q = ui.srch.q.trim();

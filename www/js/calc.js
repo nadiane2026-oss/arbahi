@@ -228,3 +228,23 @@ export function filterPeriod(list, period, now = new Date()) {
   else return list;
   return list.filter((d) => d.date >= from);
 }
+
+/**
+ * حساب ربح ورقة استلام بالطريقة المبسّطة:
+ *  المستلم − (كوست ميتا النهائي + ثمن توصيل السطوك + ثمن السطوك + ثمن التأكيد).
+ * كل بند يُدخل "لكل طرد" (يُضرب في عدد الطرود) أو "إجمالي".
+ * كوست ميتا النهائي = (الأولي باليورو × سعر اليورو) ÷ (نسبة التأكيد × نسبة التوصيل).
+ */
+export function calcPayout(i) {
+  const n = Math.max(0, Math.round(num(i.count)));
+  const modes = { meta: 'parcel', stockDel: 'total', stock: 'parcel', conf: 'parcel', ...(i.modes || {}) };
+  const scale = (v, mode) => (mode === 'total' ? num(v) : num(v) * n);
+  const initialDzd = num(i.eur) * num(i.rate);
+  const finalUnit = finalCost(initialDzd, i.confirmPct, i.deliveryPct);
+  const meta = modes.meta === 'total' ? finalUnit : finalUnit * n;
+  const stockDel = scale(i.stockDel, modes.stockDel);
+  const stock = scale(i.stock, modes.stock);
+  const conf = scale(i.conf, modes.conf);
+  const received = num(i.received);
+  return { received, count: n, initialDzd, finalUnit, meta, stockDel, stock, conf, profit: received - meta - stockDel - stock - conf };
+}

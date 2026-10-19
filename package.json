@@ -6,7 +6,7 @@
   "description": "أرباحي - حساب صافي أرباح التجارة الإلكترونية بالدفع عند الاستلام",
   "scripts": {
     "start": "node scripts/start.mjs",
-    "test": "node tests/calc.test.mjs && node tests/sync.test.mjs && node tests/crm.test.mjs && node tests/ecotrack.test.mjs && node tests/ecoweb.test.mjs"
+    "test": "node tests/calc.test.mjs && node tests/sync.test.mjs && node tests/crm.test.mjs && node tests/ecotrack.test.mjs && node tests/payout.test.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^7.0.0",

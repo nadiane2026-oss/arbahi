@@ -15,16 +15,14 @@ import * as products from './views/products.js';
 import * as stock from './views/stock.js';
 import * as channels from './views/channels.js';
 import * as carrier from './views/carrier.js';
-import * as imp from './views/import.js';
 import * as customers from './views/customers.js';
 import * as received from './views/received.js';
-import * as finance from './views/finance.js';
 import * as search from './views/search.js';
 import * as settings from './views/settings.js';
 import { initSheet, openSheet, refreshIfOpen } from './views/sheet.js';
 
-const views = { home, profit, orders, team, products, stock, channels, carrier, import: imp, customers, received, finance, search, settings };
-const TITLES = { home: 'nav.dash', profit: 'nav.profit', orders: 'nav.orders', team: 'nav.team', products: 'nav.products', stock: 'nav.stock', channels: 'nav.channels', carrier: 'nav.carrier', import: 'nav.import', customers: 'nav.customers', received: 'nav.received', finance: 'nav.finance', search: 'nav.search', settings: 'nav.settings' };
+const views = { home, profit, orders, team, products, stock, channels, carrier, customers, received, search, settings };
+const TITLES = { home: 'nav.dash', profit: 'nav.profit', orders: 'nav.orders', team: 'nav.team', products: 'nav.products', stock: 'nav.stock', channels: 'nav.channels', carrier: 'nav.carrier', import: 'nav.import', customers: 'nav.customers', received: 'nav.received', search: 'nav.search', settings: 'nav.settings' };
 const ORDER_SUBS = [...ORDER_TABS, 'all'];
 const NAV = [
   { id: 'home', k: 'nav.dash', i: 'home' },
@@ -33,7 +31,7 @@ const NAV = [
   { id: 'stock', k: 'nav.stock', i: 'stack' },
   { id: 'carrier', k: 'nav.carrier', i: 'truck' },
   { id: 'team', k: 'nav.team', i: 'user' },
-  { id: 'finance', k: 'nav.finance', i: 'wallet', subs: [['finance/uncollected', 'fin.uncollected'], ['finance/collected', 'fin.collected'], ['finance/ready', 'fin.ready'], ['finance/history', 'fin.history'], ['profit', 'nav.profit'], ['import', 'nav.import']], owns: ['finance', 'profit', 'import'] },
+  { id: 'profit', k: 'nav.profit', i: 'wallet' },
   { id: 'received', k: 'nav.received', i: 'check' },
   { id: 'customers', k: 'nav.customers', i: 'users' },
   { id: 'settings', k: 'nav.settings', i: 'settings' },
@@ -45,7 +43,8 @@ const scrim = document.getElementById('scrim');
 const open = new Set(['orders']);
 
 function parseHash() {
-  const [base, sub] = location.hash.replace('#', '').split('/');
+  let [base, sub] = location.hash.replace('#', '').split('/');
+  if (base === 'import' || base === 'finance') base = 'profit';
   return views[base] ? { base, sub: sub || '' } : { base: 'home', sub: '' };
 }
 const isActive = (item) => (item.owns ? item.owns.includes(ui.tab) : item.id === ui.tab);
@@ -122,7 +121,7 @@ window.addEventListener('dragover', (e) => e.preventDefault());
 window.addEventListener('drop', (e) => {
   e.preventDefault();
   const f = e.dataTransfer?.files?.[0];
-  if (f && ui.tab === 'import' && !document.getElementById('drop')?.contains(e.target)) imp.handleFile(f);
+  if (f && ui.tab === 'profit' && !document.getElementById('drop')?.contains(e.target)) profit.handleFile(f);
 });
 
 let queued = false;

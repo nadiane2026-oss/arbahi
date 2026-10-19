@@ -2,11 +2,8 @@
 // كل تغيير في الحالة (أو طلبية جديدة للتأكيد، أو ملاحظة جديدة من الموزّع) يصلك كإشعار.
 import { store } from './core.js';
 import { ecoConfig } from './transport.js';
-import { syncEcotrack, autoComputeBatches } from './ops.js';
-import { decharge } from './calc.js';
+import { syncEcotrack } from './ops.js';
 import { P } from './i18n.js';
-import { orderNet } from './crm.js';
-import { fmt } from './util.js';
 import { toast } from './ui.js';
 
 const EVERY = 3 * 60e3;
@@ -26,23 +23,8 @@ async function askPermission() {
 }
 
 let nid = Math.floor(Date.now() / 1000) % 100000;
-function payMessages(changes, made = []) {
-  const by = { collected: [], ready: [], paid: [] };
-  for (const c of changes) { if (c.pay && by[c.payTo]) { const o = store.get('order', c.id); if (o) by[c.payTo].push(o); } }
-  const sum = (l) => l.reduce((a, o) => a + orderNet(o), 0);
+function messages(changes) {
   const out = [];
-  if (by.collected.length) out.push({ title: P('notif.collected'), body: P('notif.collectedBody', { n: by.collected.length, a: fmt(sum(by.collected)) }), id: '', money: true });
-  if (by.ready.length) out.push({ title: P('notif.payReady'), body: P('notif.payReadyBody', { n: by.ready.length, a: fmt(sum(by.ready)) }), id: '', money: true });
-  if (by.paid.length) {
-    const ctx = store.ctx();
-    const profit = made.reduce((a, m) => { const d = store.get('decharge', m.id); return a + (d ? decharge(d, ctx).profit : 0); }, 0);
-    out.push({ title: P('notif.paid'), body: made.length ? P('notif.paidProfit', { a: fmt(sum(by.paid)), p: fmt(profit) }) : P('notif.paidBody', { a: fmt(sum(by.paid)) }), id: '', money: true });
-  }
-  return out;
-}
-
-function messages(changes, made) {
-  const out = payMessages(changes, made);
   for (const c of changes) {
     if (c.pay) continue;
     const o = store.get('order', c.id);
@@ -55,8 +37,8 @@ function messages(changes, made) {
   return out;
 }
 
-async function notify(changes, made = []) {
-  const list = messages(changes, made);
+async function notify(changes) {
+  const list = messages(changes);
   if (!list.length) return;
   toast(list.length === 1 ? `${list[0].title} — ${list[0].body}` : P('notif.many', { n: list.length }));
   const ln = LN();
@@ -72,13 +54,11 @@ export async function runEcoSync({ silent = true } = {}) {
   ecoSync.running = true; ecoSync.error = ''; emit();
   try {
     const r = await syncEcotrack();
-    const made = autoComputeBatches();
-    r.made = made;
     ecoSync.last = r; ecoSync.lastAt = Date.now();
     let first = false;
     try { first = !localStorage.getItem(INIT_KEY); localStorage.setItem(INIT_KEY, '1'); } catch { /* تجاهل */ }
     if (first) { if (!silent || r.added) toast(P('notif.firstSync', { n: r.added })); }
-    else { await notify(r.changes, made); if (!silent && !r.changes.length) toast(P('notif.nothing')); }
+    else { await notify(r.changes); if (!silent && !r.changes.length) toast(P('notif.nothing')); }
     return r;
   } catch (e) {
     ecoSync.error = e.message || String(e);

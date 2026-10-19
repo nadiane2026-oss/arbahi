@@ -1,10 +1,12 @@
 import { store, ui, hooks } from '../core.js';
-import { filterPeriod, decharge, sumTotals, splitProfit } from '../calc.js';
-import { esc, fmt, ltr, daHtml } from '../util.js';
-import { icon, pageHead, COLORS } from '../ui.js';
-import { T, P, D } from '../i18n.js';
+import { decharge, splitProfit, calcPayout } from '../calc.js';
+import { parsePdf } from '../pdf-parse.js';
+import { dashStats } from '../crm.js';
+import { esc, fmt, ltr, num, uid } from '../util.js';
+import { icon, pageHead, toast, COLORS } from '../ui.js';
+import { T, P } from '../i18n.js';
 
-const PERIODS = ['today', '7d', 'month', '30d', 'all'];
+export const noRerender = true;
 
 export function splitHtml(people, profit) {
   if (!(profit > 0) || people.some((p) => p.amount < 0)) {
@@ -32,67 +34,164 @@ export function equationHtml(t) {
   </div>`;
 }
 
-export function render() {
-  const all = store.decharges();
-  if (!all.length) {
-    return pageHead('nav.profit') + `<div class="empty">
-      <h2>${T('home.empty.title')}</h2>
-      <p>${T('home.empty.text')}</p>
-      <button class="btn" data-act="goImport">${icon('upload')} ${T('home.empty.cta')}</button>
-    </div>`;
-  }
-  const ctx = store.ctx();
-  const list = filterPeriod(all, ui.period);
-  const rows = list.map((d) => ({ d, t: decharge(d, ctx) }));
-  const tot = sumTotals(rows.map((r) => r.t));
-  const people = splitProfit(tot.profit, ctx.settings);
-  const maxAbs = Math.max(1, ...rows.map((r) => Math.abs(r.t.profit)));
 
-  const warn = tot.unassigned
-    ? `<div class="banner">${icon('alert')}<div>${T('home.unassigned', { n: tot.unassigned })}</div></div>` : '';
+let pending = null; // {parsed, refId, fileName}
+let busy = false;
+let error = '';
+let result = null;
 
-  const cell = (lk, cls, inner) => `<td data-l="${esc(P(lk))}" class="${cls}">${inner}</td>`;
-  const body = rows.map(({ d, t }) => `
-    <tr data-act="open" data-id="${esc(d.id)}" tabindex="0">
-      ${cell('th.sheet', 'full', `<div class="ref">${esc(d.ref || '—')}${t.unassigned ? ` <span class="tag">${icon('alert')} ${T('tag.noProduct', { n: t.unassigned })}</span>` : ''}</div><div class="sub">${ltr(d.date)}${d.sender ? '، ' + esc(d.sender) : ''}</div>`)}
-      ${cell('th.parcels', 'n num', `<bdi>${t.count}</bdi>`)}
-      ${cell('th.collected', 'n num', `<bdi>${fmt(t.net)}</bdi>`)}
-      ${cell('th.products', 'n num', `<bdi>${fmt(t.buy)}</bdi>`)}
-      ${cell('th.meta', 'n num', `<bdi>${fmt(t.meta)}</bdi>`)}
-      ${cell('th.commit', 'n num', `<bdi>${fmt(t.commit)}</bdi>`)}
-      ${cell('th.profit', 'n num ' + (t.profit >= 0 ? 'pos' : 'neg'), `<bdi>${fmt(t.profit)}</bdi><span class="pbar" style="width:${Math.max(4, (Math.abs(t.profit) / maxAbs) * 100).toFixed(0)}%"></span>`)}
-    </tr>`).join('');
+async function loadPdfJs() {
+  const lib = await import('../../vendor/pdf.min.mjs');
+  lib.GlobalWorkerOptions.workerSrc = new URL('../../vendor/pdf.worker.min.mjs', import.meta.url).href;
+  return lib;
+}
 
-  const foot = rows.length > 1 ? `<tfoot><tr>
-      ${cell('total', 'full', T('total'))}
-      ${cell('th.parcels', 'n num', `<bdi>${tot.count}</bdi>`)}
-      ${cell('th.collected', 'n num', `<bdi>${fmt(tot.net)}</bdi>`)}
-      ${cell('th.products', 'n num', `<bdi>${fmt(tot.buy)}</bdi>`)}
-      ${cell('th.meta', 'n num', `<bdi>${fmt(tot.meta)}</bdi>`)}
-      ${cell('th.commit', 'n num', `<bdi>${fmt(tot.commit)}</bdi>`)}
-      ${cell('th.profit', 'n num', `<bdi>${fmt(tot.profit)}</bdi>`)}</tr></tfoot>` : '';
-  const th = (k, n = false) => `<th${n ? ' class="n"' : ''}>${T(k)}</th>`;
+export async function handleFile(file) {
+  if (!file) return;
+  error = ''; pending = null; result = null; busy = true; hooks.refresh(true);
+  try {
+    if (!/pdf$/i.test(file.name) && file.type !== 'application/pdf') throw new Error(P('import.notPdf'));
+    const parsed = await parsePdf(await file.arrayBuffer(), await loadPdfJs());
+    if (!parsed.rows.length) throw new Error(parsed.warnings[0] || P('err.nothing'));
+    const base = 'd-' + (String(parsed.ref).replace(/\D/g, '') || uid());
+    const ex = store.get('decharge', base);
+    const refId = ex && ex.sender && parsed.sender && ex.sender !== parsed.sender ? base + '-' + uid().slice(0, 4) : base;
+    pending = { parsed, refId, fileName: file.name };
+  } catch (e) { error = e.message || String(e); } finally { busy = false; hooks.refresh(true); }
+}
 
-  return `${pageHead('nav.profit')}
-    <div class="seg" role="group" aria-label="${esc(P('period.aria'))}">${PERIODS.map((k) => `<button data-act="period" data-p="${k}" aria-pressed="${ui.period === k}">${T('period.' + k)}</button>`).join('')}</div>
-    ${warn}
-    <section class="hero" aria-label="${esc(P('eq.profit'))}">
-      <div class="hero-label">${T('home.profitFor', { p: D['period.' + ui.period] })}</div>
-      <div class="hero-num num ${tot.profit < 0 ? 'neg' : ''}"><bdi>${fmt(tot.profit)}</bdi><small>DA</small></div>
-      ${rows.length ? splitHtml(people, tot.profit) : `<p class="split-empty">${T('home.noneShort')}</p>`}
+/** نسبتا التأكيد والتوصيل من طلباتك الحقيقية (يحسبها التطبيق) */
+export function autoRates(orders) {
+  const st = dashStats(orders, 'all');
+  const ok = st.total >= 5;
+  return {
+    confirm: ok && st.confirmed ? Math.round((st.confirmed / st.total) * 1000) / 10 : 0,
+    delivery: ok && st.sent ? Math.round((st.delivered / st.sent) * 1000) / 10 : 0,
+    st,
+  };
+}
+
+const MODES = ['parcel', 'total'];
+function field(id, labelKey, val, modeKey, modes, hint = '') {
+  const m = modeKey ? `<select class="pc-mode" data-chg="pcm" data-k="${modeKey}" aria-label="${esc(P('pc.mode'))}">${MODES.map((x) => `<option value="${x}" ${modes[modeKey] === x ? 'selected' : ''}>${esc(P('pc.m.' + x))}</option>`).join('')}</select>` : '';
+  return `<div class="pc-row"><label class="field"><span>${T(labelKey)}</span><input id="${id}" class="n" inputmode="decimal" dir="ltr" data-chg="pcv" data-k="${id}" value="${esc(val ?? '')}" placeholder="0"></label>${m}</div>${hint ? `<p class="hint pc-hint">${hint}</p>` : ''}`;
+}
+
+function pdfCard() {
+  if (busy) return `<div class="drop"><h2>${T('import.reading')}</h2></div>`;
+  if (!pending) return `<div class="drop" id="drop">${icon('upload', 'big')}<h2>${T('pc.drop')}</h2><p class="hint">${T('pc.dropText')}</p><button class="btn" data-act="pick">${T('import.pick')}</button></div>`;
+  const { parsed } = pending;
+  return `<section class="pc-card"><div class="pc-sum">
+      <div><div class="k">${T('import.sumRef')}</div><div class="v">${esc(parsed.ref || '—')}</div></div>
+      <div><div class="k">${T('import.sumDate')}</div><div class="v num">${ltr(parsed.date)}</div></div>
+      <div><div class="k">${T('import.sumParcels')}</div><div class="v num">${parsed.rows.length}</div></div>
+      <div class="big"><div class="k">${T('pc.received')}</div><div class="v num"><bdi>${fmt(parsed.sumNet)}</bdi> <small>DA</small></div></div>
+    </div><button class="btn ghost sm" data-act="pick">${icon('upload')} ${T('pc.change')}</button></section>`;
+}
+
+function formCard() {
+  const s = store.settings();
+  const modes = { meta: 'parcel', stockDel: 'total', stock: 'parcel', conf: 'parcel', ...(s.pcModes || {}) };
+  const a = autoRates(store.orders());
+  const cv = s.pcConfirm !== '' && s.pcConfirm != null ? s.pcConfirm : a.confirm || '';
+  const dv = s.pcDelivery !== '' && s.pcDelivery != null ? s.pcDelivery : a.delivery || '';
+  const hintC = a.st.total >= 5 ? T('pc.autoC', { a: a.st.confirmed, b: a.st.total }) : T('pc.autoNone');
+  const hintD = a.st.total >= 5 ? T('pc.autoD', { a: a.st.delivered, b: a.st.sent }) : '';
+  return `<section class="pc-card">
+    <h2 class="pc-h">${T('pc.vars')}</h2>
+    ${field('pcEur', 'pc.eur', s.pcEur, 'meta', modes)}
+    ${field('pcRate', 'pc.rate', s.pcRate, '', modes)}
+    ${field('pcConfirm', 'pc.confirmRate', cv, '', modes, `${hintC} ${(s.pcConfirm !== '' && s.pcConfirm != null) ? '' : ''}`)}
+    ${field('pcDelivery', 'pc.deliveryRate', dv, '', modes, hintD)}
+    <div class="oc-actions"><button class="btn ghost sm" data-act="pcauto">${icon('refresh')} ${T('pc.useAuto')}</button></div>
+    ${field('pcStockDel', 'pc.stockDel', s.pcStockDel, 'stockDel', modes)}
+    ${field('pcStock', 'pc.stock', s.pcStock, 'stock', modes)}
+    ${field('pcConf', 'pc.confPrice', s.pcConf, 'conf', modes)}
+    <button class="btn pc-go" data-act="pcalc">${icon('check')} ${T('pc.calc')}</button>
+  </section>`;
+}
+
+function resultCard() {
+  if (!result) return '';
+  const r = result.r;
+  const item = (k, v, op, cls = '', extra = '') => `<div class="eq ${extra}"><div class="k">${T(k)}</div><div class="v num ${cls}">${op ? `<span class="op">${op}</span>` : ''}<bdi>${fmt(v)}</bdi></div></div>`;
+  return `<section class="hero" id="pcres">
+      <div class="hero-label">${T('pc.profitOf', { ref: esc(result.ref || '') })}</div>
+      <div class="hero-num num ${r.profit < 0 ? 'neg' : ''}"><bdi>${fmt(r.profit)}</bdi><small>DA</small></div>
+      ${splitHtml(splitProfit(r.profit, store.settings()), r.profit)}
     </section>
-    ${equationHtml(tot)}
-    <p class="facts">${T('home.facts', { sales: daHtml(tot.sales), courier: daHtml(tot.courier), n: tot.count })}</p>
-    <div class="section-title"><h2>${T('home.ledger')}</h2><button class="btn ghost sm" data-act="goImport">${icon('upload')} ${T('home.importCta')}</button></div>
-    ${rows.length ? `<div class="ledger-wrap"><table class="ledger">
-      <thead><tr>${th('th.sheet')}${th('th.parcels', 1)}${th('th.collected', 1)}${th('th.products', 1)}${th('th.meta', 1)}${th('th.commit', 1)}${th('th.profit', 1)}</tr></thead>
-      <tbody>${body}</tbody>${foot}</table></div>` : `<p class="hint">${T('home.noneInPeriod')}</p>`}`;
+    <div class="equation">
+      ${item('pc.received', r.received, '')}
+      ${item('pc.metaFinal', r.meta, '−')}
+      ${item('pc.stockDel', r.stockDel, '−')}
+      ${item('pc.stock', r.stock, '−')}
+      ${item('pc.confPrice', r.conf, '−')}
+      ${item('eq.profit', r.profit, '=', r.profit >= 0 ? 'pos' : 'neg', 'res')}
+    </div>
+    <p class="facts">${T('pc.unit', { u: fmt(Math.round(r.finalUnit)), n: r.count })}</p>`;
+}
+
+function historyCard() {
+  const list = store.decharges().slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || (b.createdAt || 0) - (a.createdAt || 0));
+  if (!list.length) return '';
+  const ctx = store.ctx();
+  const cards = list.map((d) => {
+    const profit = d.calc ? d.calc.result.profit : decharge(d, ctx).profit;
+    return `<article class="ocard" ${d.calc ? '' : `data-act="pcopen" data-id="${esc(d.id)}" style="cursor:pointer"`}>
+      <div class="oc-head"><div><div class="ref">${esc(d.ref || '—')}</div><div class="sub">${ltr(d.date || '')} · ${T('pc.parcelsN', { n: d.count || d.parcels?.length || 0 })}</div></div>
+      <div class="stock-big num ${profit < 0 ? 'neg' : ''}"><bdi>${fmt(profit)}</bdi><small>${T('th.profit')}</small></div></div>
+      <div class="oc-actions"><button class="btn ghost sm" data-act="pcdel" data-id="${esc(d.id)}">${icon('x')} ${T('pc.delete')}</button></div></article>`;
+  }).join('');
+  return `<div class="section-title"><h2>${T('pc.history')}</h2></div><div class="ocards">${cards}</div>`;
+}
+
+export function render() {
+  return `${pageHead('nav.profit')}${error ? `<div class="banner err">${icon('alert')}<div>${esc(error)}</div></div>` : ''}
+    ${pdfCard()}${pending ? formCard() : ''}${resultCard()}${historyCard()}
+    <input type="file" id="pdfInput" accept="application/pdf,.pdf" hidden data-chg="file">`;
+}
+
+const val = (id) => document.getElementById(id)?.value.trim() ?? '';
+function calculate() {
+  if (!pending) return toast(P('pc.needPdf'));
+  const s = store.settings();
+  const modes = { meta: 'parcel', stockDel: 'total', stock: 'parcel', conf: 'parcel', ...(s.pcModes || {}) };
+  const inp = {
+    received: pending.parsed.sumNet, count: pending.parsed.rows.length,
+    eur: num(val('pcEur')), rate: num(val('pcRate')), confirmPct: num(val('pcConfirm')), deliveryPct: num(val('pcDelivery')),
+    stockDel: num(val('pcStockDel')), stock: num(val('pcStock')), conf: num(val('pcConf')), modes,
+  };
+  if (!(inp.rate > 0) && inp.eur > 0) return toast(P('pc.needRate'));
+  if (!(inp.confirmPct > 0) || !(inp.deliveryPct > 0)) return toast(P('pc.needRates'));
+  const r = calcPayout(inp);
+  const { parsed, refId } = pending;
+  const parcels = parsed.rows.map(({ ok, ...x }) => ({ ...x, items: [], noProduct: true }));
+  store.put('decharge', refId, { id: refId, ref: parsed.ref, date: parsed.date, sender: parsed.sender, count: parcels.length, total: parsed.total, parcels, createdAt: Date.now(), calc: { inputs: inp, result: r } });
+  result = { r, ref: parsed.ref };
+  toast(P('pc.saved'));
+  hooks.refresh(true);
+  setTimeout(() => document.getElementById('pcres')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
 }
 
 export const handlers = {
   click: {
-    period: (el) => { ui.period = el.dataset.p; hooks.refresh(true); },
-    open: (el) => hooks.openSheet(el.dataset.id),
-    goImport: () => hooks.go('import'),
+    pick: () => document.getElementById('pdfInput').click(),
+    pcalc: calculate,
+    pcauto: () => { store.saveSettings({ pcConfirm: '', pcDelivery: '' }); hooks.refresh(true); },
+    pcopen: (el) => hooks.openSheet(el.dataset.id),
+    pcdel: (el) => { if (confirm(P('pc.confirmDel'))) { store.del('decharge', el.dataset.id); hooks.refresh(true); } },
+  },
+  change: {
+    file: (el) => { const f = el.files[0]; el.value = ''; handleFile(f); },
+    pcv: (el) => store.saveSettings({ [el.dataset.k]: el.value.trim() }),
+    pcm: (el) => store.saveSettings({ pcModes: { ...(store.settings().pcModes || {}), [el.dataset.k]: el.value } }),
   },
 };
+
+export function afterRender(root) {
+  const drop = root.querySelector('#drop');
+  if (!drop) return;
+  drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); handleFile(e.dataTransfer.files[0]); });
+}
