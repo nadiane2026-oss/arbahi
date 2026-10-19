@@ -75,7 +75,7 @@ function cardHtml(o, s) {
     <div class="oc-line ${bad ? 'warn-t' : ''}">${esc(o.wilaya || '—')}${o.wilayaCode ? ` (${o.wilayaCode})` : ''} · ${esc(o.commune || '—')} · ${esc(P('delivery.' + o.delivery))}</div>
     <div class="oc-items">${esc(itemsText(o))}</div>
     ${bad && !fromEco && ['new', 'confirmed'].includes(o.stage) ? `<p class="hint warn-t">${T('orders.fixData')}</p>` : ''}
-    ${o.tracking ? `<div class="oc-track"><span class="tag eco-${esc(g || 'unknown')}">${T('st.' + (step || 'unknown'))}</span> ${o.eco?.label && o.eco.label !== P('st.' + step) ? `<span class="hint" dir="ltr">${esc(o.eco.label)}</span>` : ''} <span class="num" dir="ltr">${esc(o.tracking)}</span></div>` : ''}
+    ${o.tracking ? `<div class="oc-track"><span class="tag eco-${esc(g || 'unknown')}">${T('st.' + (step || 'unknown'))}</span> ${o.eco?.label && o.eco.label !== P('st.' + step) ? `<span class="hint" dir="ltr">${esc(o.eco.label)}</span>` : ''} <span class="num" dir="ltr">${esc(o.tracking)}</span>${o.payManual === 'paid' ? ` <span class="tag">${T('o.paidBy', { r: esc(o.payRef || '') })}</span>` : ''}</div>` : ''}
     ${remHtml}
     ${o.ecoError ? `<div class="banner err">${icon('alert')}<div>${esc(o.ecoError)}</div></div>` : ''}
     ${['new', 'confirmed'].includes(o.stage) ? `<div class="oc-calls">${callBtns}</div>` : ''}

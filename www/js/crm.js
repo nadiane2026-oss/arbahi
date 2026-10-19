@@ -412,13 +412,14 @@ export function dashStats(orders, key, now = new Date()) {
 
 /* ---------------- خانات الطلبات ---------------- */
 /** الخانات بنفس ترتيب المسار في Ecotrack */
-export const ORDER_TABS = ['new', 'to_station', 'at_station', 'to_wilaya', 'preparing', 'delivering', 'suspended', 'dl_unc', 'dl_col', 'dl_rdy', 'dl_paid', 'returns', 'cancelled', 'other'];
+export const ORDER_TABS = ['new', 'to_station', 'at_station', 'to_wilaya', 'preparing', 'delivering', 'suspended', 'dl_unc', 'dl_col', 'dl_rdy', 'dl_paid', 'returns', 'ret_done', 'cancelled', 'other'];
 /** في أي خانة تظهر الطلبية */
 export function orderTab(o) {
   if (o.stage === 'cancelled') return 'cancelled';
   if (o.stage === 'new' || o.stage === 'confirmed') return 'new';
   const s = stepOf(o);
   if (s === 'ready') return 'to_station'; // أكدناها ولم يتحدث Ecotrack بعد
+  if (s === 'ret_back' && !/traitement/i.test(String(o.eco?.label || ''))) return 'ret_done';
   if (s.startsWith('ret_')) return 'returns';
   if (s === 'cancelled') return 'cancelled';
   if (s === 'delivered') return { uncollected: 'dl_unc', collected: 'dl_col', ready: 'dl_rdy', paid: 'dl_paid' }[payOf(o)] || 'dl_unc';
@@ -482,7 +483,7 @@ export function payFromRaw(raw) {
 }
 export const maxPay = (list) => list.filter(Boolean).sort((a, b) => PAY_STAGES.indexOf(b) - PAY_STAGES.indexOf(a))[0] || '';
 /** مرحلة الدفع من بيانات eco (الحالة النصية + إشارات الحقول) */
-export const payOfEco = (eco, manual = '') => maxPay([payStage(eco?.label), eco?.payHint, manual]);
+export const payOfEco = (eco, manual = '') => maxPay([payStage(eco?.label), manual]);
 /** مرحلة الدفع لطلب مسلَّم (وإلا '') */
 export function payOf(o) {
   if (!o || o.stage === 'cancelled' || stepOf(o) !== 'delivered') return '';

@@ -7,6 +7,7 @@ import { ORDER_TABS, orderTab } from './crm.js';
 import { ecoSync, startEcoSync } from './ecosync.js';
 import { showWelcome } from './welcome.js';
 import { update, checkUpdate, APK_URL } from './update.js';
+import { migratePay } from './migrate.js';
 import * as home from './views/home.js';
 import * as profit from './views/profit.js';
 import * as orders from './views/orders.js';
@@ -138,6 +139,7 @@ wirePrefs();
 
 (async () => {
   await store.init();
+  migratePay();
   sync.startAuto();
   startEcoSync();
   window.__arbahi = { store, sync, ui, transport };

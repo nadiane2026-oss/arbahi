@@ -522,3 +522,5 @@ Object.assign(D, {
   'ot.dl_unc': ['Livrés · Non encaissés', 'Delivered · Not collected'], 'ot.dl_col': ['Livrés · Encaissés non payés', 'Delivered · Collected, unpaid'],
   'ot.dl_rdy': ['Livrés · Paiements prêts', 'Delivered · Payments ready'], 'ot.dl_paid': ['Livrés · Historique paiements', 'Delivered · Payment history'],
 });
+
+Object.assign(D, { 'ot.ret_done': ['Historique retours reçus', 'Returns history'], 'o.paidBy': ['✓ مدفوعة حسب {r}', '✓ paid per {r}'] });
