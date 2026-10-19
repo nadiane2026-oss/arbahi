@@ -77,7 +77,8 @@ jobs:
         run: |
           cp android/app/build/outputs/apk/debug/app-debug.apk arbahi.apk
           gh release delete latest --yes --cleanup-tag || true
-          gh release create latest arbahi.apk --title "Arbahi APK" --notes "build ${{ github.run_number }} - Download arbahi.apk and install it on the phone."
+          cp arbahi.apk "arbahi-${{ github.run_number }}.0.apk"
+          gh release create latest "arbahi-${{ github.run_number }}.0.apk" arbahi.apk --title "Arbahi ${{ github.run_number }}.0" --notes "build ${{ github.run_number }} - Download arbahi-${{ github.run_number }}.0.apk and install it on the phone."
 
   pages:
     runs-on: ubuntu-latest
