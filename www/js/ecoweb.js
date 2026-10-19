@@ -78,7 +78,12 @@ async function fetchAll(path, maxPages = 6) {
 export async function fetchWebStages(trackings) {
   webInfo.at = Date.now(); webInfo.error = ''; webInfo.pages = {};
   const c = ecoConfig();
-  if (!isNative() || !HTTP() || !c.webUser || !c.webPass || !c.url) { webInfo.ok = null; return null; }
+  webInfo.reason = '';
+  if (!isNative()) webInfo.reason = 'not-native-app';
+  else if (!HTTP()) webInfo.reason = 'no-http-plugin';
+  else if (!c.url) webInfo.reason = 'missing-platform-url';
+  else if (!c.webUser || !c.webPass) webInfo.reason = 'missing-ecotrack-login (شركة التوصيل ← خانتا الدخول ← حفظ)';
+  if (webInfo.reason) { webInfo.ok = null; return null; }
   const list = [...new Set(trackings)].filter((t) => String(t).length >= 6);
   const out = new Map();
   try {
