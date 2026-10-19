@@ -458,3 +458,4 @@ details.more[open] > summary { margin-bottom: 10px; }
 .upd-pill { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 99px; background: linear-gradient(135deg, var(--o2), var(--o1)); color: var(--o-ink); font-weight: 800; font-size: 13px; text-decoration: none; white-space: nowrap; flex: none; }
 .upd-pill svg { width: 16px; height: 16px; }
 .brand .logo-mark { width: 34px; height: 34px; border-radius: 9px; display: block; }
+.ver{font-size:.62em;font-weight:700;opacity:.65;margin-inline-start:.4em;padding:1px 6px;border-radius:999px;background:rgba(127,127,127,.18);vertical-align:middle}

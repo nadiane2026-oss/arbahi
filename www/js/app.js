@@ -73,7 +73,7 @@ function renderTop() {
   top.innerHTML = `<button class="burger" data-burger aria-label="${P('nav.menu')}">${icon('menu')}</button>
     ${atHome && trail.length < 2 ? '' : `<button class="burger" data-back aria-label="${P('nav.back')}">${icon('back', 'flip')}</button>`}
     ${atHome ? '' : `<button class="burger" data-home aria-label="${P('nav.dash')}">${icon('home')}</button>`}
-    <div class="grow">${T(TITLES[ui.tab] || 'nav.dash')}</div> ${update.available ? `<a class="upd-pill" href="${APK_URL}" target="_blank" rel="noopener">${icon('download')} ${T('upd.btn')}</a>` : ''}<a class="burger" href="#search" aria-label="${P('nav.search')}">${icon('search')}</a>${syncChip()}${prefButtons()}`;
+    <div class="grow">${T(TITLES[ui.tab] || 'nav.dash')}${update.build ? ` <small class="ver" dir="ltr">v${update.build}</small>` : ''}</div> ${update.available ? `<a class="upd-pill" href="${APK_URL}" target="_blank" rel="noopener">${icon('download')} ${T('upd.btn')}</a>` : ''}<a class="burger" href="#search" aria-label="${P('nav.search')}">${icon('search')}</a>${syncChip()}${prefButtons()}`;
 }
 
 const trail = [location.hash];
